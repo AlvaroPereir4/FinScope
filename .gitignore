@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+.venv1/
+env/
+
+# Environment Variables (Secrets - MUITO IMPORTANTE)
+.env
+
+# IDE settings (PyCharm / VS Code)
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# OS generated files
+Thumbs.db
