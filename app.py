@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
+import re
 
 load_dotenv()
 
@@ -52,7 +53,7 @@ def login():
         
         if user_data and check_password_hash(user_data['password_hash'], password):
             user = User(user_data)
-            session.permanent = True  # Ativa a duração de 6 horas
+            session.permanent = True
             login_user(user)
             return redirect(url_for('index'))
         else:
@@ -100,13 +101,36 @@ def cards_page():
 
 # --- API Endpoints ---
 
-# Helper para serializar ObjectId e Datas
 def serialize_doc(doc):
     if not doc: return None
     doc['_id'] = str(doc['_id'])
     if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
     if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
     return doc
+
+# 0. Configurações (NOVO)
+@app.route('/api/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    if request.method == 'POST':
+        data = request.json
+        # Atualiza ou cria as configurações (Upsert)
+        db.user_settings.update_one(
+            {"user_id": ObjectId(current_user.id)},
+            {"$set": {"categories": data.get('categories', [])}},
+            upsert=True
+        )
+        return jsonify({"status": "success"})
+
+    # GET
+    settings = db.user_settings.find_one({"user_id": ObjectId(current_user.id)})
+    
+    if not settings:
+        # Padrões se não existir configuração
+        default_categories = ["Alimentação", "Moradia", "Transporte", "Lazer", "Saúde", "Outros"]
+        return jsonify({"categories": default_categories})
+    
+    return jsonify(serialize_doc(settings))
 
 # 1. Cartões
 @app.route('/api/cards', methods=['GET', 'POST'])
@@ -127,7 +151,6 @@ def cards():
         new_card['_id'] = result.inserted_id
         return jsonify(serialize_doc(new_card))
     
-    # GET
     cards = list(db.credit_cards.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(c) for c in cards])
 
@@ -141,14 +164,13 @@ def incomes():
             "user_id": ObjectId(current_user.id),
             "description": data['description'],
             "amount": float(data['amount']),
-            "date": data['date'], # Mantendo como string YYYY-MM-DD para facilitar
+            "date": data['date'],
             "created_at": datetime.utcnow()
         }
         result = db.incomes.insert_one(new_income)
         new_income['_id'] = result.inserted_id
         return jsonify([serialize_doc(new_income)])
     
-    # GET
     incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
@@ -169,6 +191,7 @@ def expenses():
             "category": data.get('category', 'Geral'),
             "date": data['date'],
             "establishment": data.get('establishment'),
+            "buyer": data.get('buyer'),
             "payment_method": data.get('payment_method'),
             "card_id": ObjectId(card_id) if card_id else None,
             "installments": data.get('installments'),
@@ -180,10 +203,30 @@ def expenses():
         new_expense['_id'] = result.inserted_id
         return jsonify([serialize_doc(new_expense)])
             
-    # GET
-    expenses = list(db.expenses.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
+    # GET com Filtros
+    query = {"user_id": ObjectId(current_user.id)}
     
-    # Enriquecer com nome do cartão (Join manual, já que Mongo não tem JOIN nativo simples)
+    search_term = request.args.get('search')
+    if search_term:
+        regex = re.compile(search_term, re.IGNORECASE)
+        query["$or"] = [
+            {"description": regex},
+            {"establishment": regex},
+            {"category": regex},
+            {"buyer": regex}
+        ]
+    
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if start_date or end_date:
+        date_query = {}
+        if start_date: date_query["$gte"] = start_date
+        if end_date: date_query["$lte"] = end_date
+        query["date"] = date_query
+
+    expenses = list(db.expenses.find(query).sort("date", -1))
+    
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})

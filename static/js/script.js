@@ -6,7 +6,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const cardSelect = document.getElementById('exp-card');
     const methodSelect = document.getElementById('exp-method');
     const cardGroup = document.getElementById('card-select-group');
-    const installmentsGroup = document.getElementById('installments-group');
+    const categorySelect = document.getElementById('exp-category');
+    
+    // Search Elements
+    const btnSearch = document.getElementById('btn-search');
+    const btnClear = document.getElementById('btn-clear');
+    const searchTerm = document.getElementById('search-term');
+    const searchStart = document.getElementById('search-start');
+    const searchEnd = document.getElementById('search-end');
+    const searchTotalAmount = document.getElementById('search-total-amount');
+    const searchCount = document.getElementById('search-count');
+
+    // Settings Modal Elements
+    const btnSettings = document.getElementById('btn-settings');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeModal = document.querySelector('.close-modal');
+    const categoriesList = document.getElementById('categories-list');
+    const newCategoryInput = document.getElementById('new-category-input');
+    const btnAddCategory = document.getElementById('btn-add-category');
+    const btnSaveSettings = document.getElementById('btn-save-settings');
+    
+    let currentCategories = [];
     
     // Default dates
     const today = new Date().toISOString().split('T')[0];
@@ -19,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(document.getElementById('financeChart')) {
         loadData();
         loadCards();
+        loadSettings();
     }
 
     // Event Listeners
@@ -26,37 +47,128 @@ document.addEventListener('DOMContentLoaded', () => {
     if(expenseForm) expenseForm.addEventListener('submit', (e) => handleFormSubmit(e, 'expense'));
     
     if(methodSelect) methodSelect.addEventListener('change', toggleCardSelect);
+    
+    if(btnSearch) btnSearch.addEventListener('click', () => loadData(true));
+    if(btnClear) btnClear.addEventListener('click', clearSearch);
+
+    // Settings Events
+    if(btnSettings) {
+        btnSettings.addEventListener('click', () => {
+            settingsModal.style.display = 'flex';
+            renderCategoriesList();
+        });
+        
+        closeModal.addEventListener('click', () => settingsModal.style.display = 'none');
+        
+        window.addEventListener('click', (e) => {
+            if (e.target === settingsModal) settingsModal.style.display = 'none';
+        });
+
+        btnAddCategory.addEventListener('click', () => {
+            const val = newCategoryInput.value.trim();
+            if(val && !currentCategories.includes(val)) {
+                currentCategories.push(val);
+                newCategoryInput.value = '';
+                renderCategoriesList();
+            }
+        });
+
+        btnSaveSettings.addEventListener('click', saveSettings);
+    }
 
     function toggleCardSelect() {
         const method = methodSelect.value;
         if (method === 'credito') {
-            cardGroup.style.display = 'block';
-            installmentsGroup.style.display = 'block';
+            cardGroup.style.display = 'grid';
         } else {
             cardGroup.style.display = 'none';
-            installmentsGroup.style.display = 'none';
             cardSelect.value = '';
             document.getElementById('exp-installments').value = '';
         }
     }
+
+    function clearSearch() {
+        searchTerm.value = '';
+        searchStart.value = '';
+        searchEnd.value = '';
+        loadData(false);
+    }
+
+    // --- Settings Logic ---
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            currentCategories = data.categories || [];
+            updateCategorySelect();
+        } catch (err) { console.error(err); }
+    }
+
+    async function saveSettings() {
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ categories: currentCategories })
+            });
+            if(res.ok) {
+                settingsModal.style.display = 'none';
+                updateCategorySelect();
+                alert('Configurações salvas!');
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    function renderCategoriesList() {
+        categoriesList.innerHTML = '';
+        currentCategories.forEach((cat, index) => {
+            const item = document.createElement('div');
+            item.className = 'category-item';
+            item.innerHTML = `
+                <span>${cat}</span>
+                <button class="btn-remove-cat" data-index="${index}">×</button>
+            `;
+            categoriesList.appendChild(item);
+        });
+
+        document.querySelectorAll('.btn-remove-cat').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.index);
+                currentCategories.splice(idx, 1);
+                renderCategoriesList();
+            });
+        });
+    }
+
+    function updateCategorySelect() {
+        if(!categorySelect) return;
+        categorySelect.innerHTML = '';
+        currentCategories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.textContent = cat;
+            categorySelect.appendChild(opt);
+        });
+    }
+
+    // --- Data Logic ---
 
     async function loadCards() {
         try {
             const res = await fetch('/api/cards');
             const cards = await res.json();
             
-            // Populate select if exists (Dashboard)
             if(cardSelect) {
                 cardSelect.innerHTML = '<option value="">Selecione...</option>';
                 cards.forEach(card => {
                     const option = document.createElement('option');
-                    option.value = card._id; // Mongo uses _id
+                    option.value = card._id;
                     option.textContent = card.name;
                     cardSelect.appendChild(option);
                 });
             }
-
-            // Populate grid if exists (Cards Page)
+            
             const container = document.getElementById('cards-container');
             if(container) {
                 container.innerHTML = '';
@@ -103,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: parseFloat(document.getElementById('exp-amount').value),
                 date: document.getElementById('exp-date').value,
                 establishment: document.getElementById('exp-establishment').value,
+                buyer: document.getElementById('exp-buyer').value,
                 category: document.getElementById('exp-category').value,
                 payment_method: document.getElementById('exp-method').value,
                 card_id: document.getElementById('exp-card').value || null,
@@ -122,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.target.reset();
                 document.getElementById(isIncome ? 'inc-date' : 'exp-date').value = today;
                 if (!isIncome) toggleCardSelect(); 
-                loadData();
+                loadData(); 
             } else {
                 alert('Erro ao salvar dados');
             }
@@ -131,23 +244,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function loadData() {
+    async function loadData(isSearch = false) {
         try {
+            let expenseUrl = '/api/expenses';
+            if (isSearch) {
+                const params = new URLSearchParams();
+                if(searchTerm.value) params.append('search', searchTerm.value);
+                if(searchStart.value) params.append('start_date', searchStart.value);
+                if(searchEnd.value) params.append('end_date', searchEnd.value);
+                expenseUrl += `?${params.toString()}`;
+            }
+
             const [incomesRes, expensesRes] = await Promise.all([
-                fetch('/api/incomes'),
-                fetch('/api/expenses')
+                fetch('/api/incomes'), 
+                fetch(expenseUrl)
             ]);
 
             const incomes = await incomesRes.json();
             const expenses = await expensesRes.json();
 
-            updateDashboard(incomes, expenses);
-            updateTable(incomes, expenses);
-            updateChart(incomes, expenses);
+            if (!isSearch) {
+                updateDashboard(incomes, expenses);
+                updateChart(incomes, expenses);
+            }
+            
+            updateTable(incomes, expenses, isSearch);
+            updateSearchStats(expenses, isSearch);
 
         } catch (error) {
             console.error('Error loading data:', error);
         }
+    }
+
+    function updateSearchStats(expenses, isSearch) {
+        if (!isSearch) {
+            searchTotalAmount.textContent = '---';
+            searchCount.textContent = '---';
+            return;
+        }
+
+        const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+        searchTotalAmount.textContent = formatCurrency(total);
+        searchCount.textContent = expenses.length;
     }
 
     function updateDashboard(incomes, expenses) {
@@ -163,15 +301,29 @@ document.addEventListener('DOMContentLoaded', () => {
         balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
     }
 
-    function updateTable(incomes, expenses) {
+    function updateTable(incomes, expenses, isSearch) {
         historyTableBody.innerHTML = '';
         
-        const allItems = [
-            ...incomes.map(i => ({...i, type: 'income'})),
-            ...expenses.map(e => ({...e, type: 'expense'}))
-        ].sort((a, b) => new Date(b.date) - new Date(a.date));
+        let allItems = [];
+        
+        if (isSearch) {
+            const term = searchTerm.value.toLowerCase();
+            const filteredIncomes = incomes.filter(i => i.description.toLowerCase().includes(term));
+            
+            allItems = [
+                ...filteredIncomes.map(i => ({...i, type: 'income'})),
+                ...expenses.map(e => ({...e, type: 'expense'}))
+            ];
+        } else {
+            allItems = [
+                ...incomes.map(i => ({...i, type: 'income'})),
+                ...expenses.map(e => ({...e, type: 'expense'}))
+            ];
+        }
 
-        allItems.slice(0, 10).forEach(item => {
+        allItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        allItems.forEach(item => {
             const row = document.createElement('tr');
             const isIncome = item.type === 'income';
             
@@ -194,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="desc-main">${item.description}</div>
                     ${!isIncome && item.establishment ? `<div class="desc-sub">${item.establishment}</div>` : ''}
                 </td>
+                <td>${!isIncome && item.buyer ? item.buyer : '-'}</td>
                 <td>${details}</td>
                 <td class="${isIncome ? 'amount-positive' : 'amount-negative'}">
                     ${isIncome ? '+' : '-'} ${formatCurrency(item.amount)}

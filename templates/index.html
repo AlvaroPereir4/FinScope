@@ -17,6 +17,8 @@
             <div class="user-controls">
                 <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
                 <span class="divider">|</span>
+                <button id="btn-settings" class="btn-icon" title="Configurações">⚙️</button>
+                <span class="divider">|</span>
                 <span>Olá, {{ username }}</span>
                 <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
             </div>
@@ -91,19 +93,18 @@
                                 <input type="text" id="exp-establishment" placeholder="Ex: Restaurante X">
                             </div>
                             <div class="form-group">
-                                <label>Categoria</label>
-                                <select id="exp-category">
-                                    <option value="Alimentação">Alimentação</option>
-                                    <option value="Moradia">Moradia</option>
-                                    <option value="Transporte">Transporte</option>
-                                    <option value="Lazer">Lazer</option>
-                                    <option value="Saúde">Saúde</option>
-                                    <option value="Outros">Outros</option>
-                                </select>
+                                <label>Comprador</label>
+                                <input type="text" id="exp-buyer" placeholder="Quem comprou?">
                             </div>
                         </div>
 
                         <div class="form-row">
+                            <div class="form-group">
+                                <label>Categoria</label>
+                                <select id="exp-category">
+                                    <!-- JS will populate -->
+                                </select>
+                            </div>
                             <div class="form-group">
                                 <label>Método</label>
                                 <select id="exp-method" onchange="toggleCardSelect()">
@@ -113,17 +114,17 @@
                                     <option value="dinheiro">Dinheiro</option>
                                 </select>
                             </div>
-                            <div class="form-group" id="card-select-group" style="display: none;">
+                        </div>
+
+                        <div class="form-row" id="card-select-group" style="display: none;">
+                            <div class="form-group">
                                 <label>Cartão</label>
                                 <select id="exp-card">
                                     <option value="">Selecione...</option>
                                     <!-- JS populates -->
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="form-row" id="installments-group" style="display: none;">
-                            <div class="form-group">
+                            <div class="form-group" id="installments-group">
                                 <label>Parcelas</label>
                                 <input type="text" id="exp-installments" placeholder="Ex: 1/10">
                             </div>
@@ -139,8 +140,32 @@
                 </section>
             </div>
 
+            <!-- Seção de Busca e Relatórios -->
             <section class="history-section">
-                <h2>Histórico Recente</h2>
+                <div class="section-header">
+                    <h2>Relatórios e Busca</h2>
+                </div>
+                
+                <div class="search-bar">
+                    <div class="search-inputs">
+                        <input type="text" id="search-term" placeholder="Buscar por nome, local, comprador...">
+                        <input type="date" id="search-start">
+                        <input type="date" id="search-end">
+                        <button id="btn-search" class="btn-primary" style="width: auto; margin: 0;">Filtrar</button>
+                        <button id="btn-clear" class="btn-secondary">Limpar</button>
+                    </div>
+                    <div class="search-stats">
+                        <div class="stat-item">
+                            <span>Total Encontrado:</span>
+                            <strong id="search-total-amount">R$ 0,00</strong>
+                        </div>
+                        <div class="stat-item">
+                            <span>Itens:</span>
+                            <strong id="search-count">0</strong>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <table id="history-table">
                         <thead>
@@ -148,6 +173,7 @@
                                 <th>Data</th>
                                 <th>Tipo</th>
                                 <th>Descrição</th>
+                                <th>Comprador</th>
                                 <th>Detalhes</th>
                                 <th>Valor</th>
                             </tr>
@@ -160,6 +186,30 @@
             </section>
         </main>
     </div>
+
+    <!-- Modal de Configurações -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Configurações</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Categorias de Gastos</h3>
+                <div class="categories-list" id="categories-list">
+                    <!-- JS will populate -->
+                </div>
+                <div class="add-category-form">
+                    <input type="text" id="new-category-input" placeholder="Nova categoria...">
+                    <button id="btn-add-category" class="btn-primary" style="width: auto;">+</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-save-settings" class="btn-primary">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
