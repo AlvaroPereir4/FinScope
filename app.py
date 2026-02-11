@@ -6,21 +6,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import re
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "dev_key_mongo")
-
-# Configuração da Sessão (6 horas)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=6)
 
-# Configuração do MongoDB
 client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017/finscope"))
 db = client.get_database()
 
-# Configuração do Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -35,22 +32,24 @@ class User(UserMixin):
 def load_user(user_id):
     try:
         user_data = db.users.find_one({"_id": ObjectId(user_id)})
-        if user_data:
-            return User(user_data)
-    except:
-        pass
+        if user_data: return User(user_data)
+    except: pass
     return None
 
-# --- Rotas de Autenticação ---
+def serialize_doc(doc):
+    if not doc: return None
+    doc['_id'] = str(doc['_id'])
+    if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
+    if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
+    return doc
 
+# --- Rotas Auth ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         user_data = db.users.find_one({"username": username})
-        
         if user_data and check_password_hash(user_data['password_hash'], password):
             user = User(user_data)
             session.permanent = True
@@ -58,7 +57,6 @@ def login():
             return redirect(url_for('index'))
         else:
             flash('Usuário ou senha inválidos')
-            
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -66,19 +64,13 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         if db.users.find_one({"username": username}):
             flash('Nome de usuário já existe.')
         else:
             hashed_password = generate_password_hash(password)
-            db.users.insert_one({
-                "username": username,
-                "password_hash": hashed_password,
-                "created_at": datetime.utcnow()
-            })
-            flash('Conta criada com sucesso! Faça login.')
+            db.users.insert_one({"username": username, "password_hash": hashed_password, "created_at": datetime.utcnow()})
+            flash('Conta criada! Faça login.')
             return redirect(url_for('login'))
-            
     return render_template('register.html')
 
 @app.route('/logout')
@@ -87,8 +79,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# --- Rotas Principais ---
-
+# --- Pages ---
 @app.route('/')
 @login_required
 def index():
@@ -99,40 +90,34 @@ def index():
 def cards_page():
     return render_template('cards.html')
 
-# --- API Endpoints ---
+# --- API ---
 
-def serialize_doc(doc):
-    if not doc: return None
-    doc['_id'] = str(doc['_id'])
-    if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
-    if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
-    return doc
-
-# 0. Configurações (NOVO)
+# Configurações (Categorias e Compradores)
 @app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
     if request.method == 'POST':
         data = request.json
-        # Atualiza ou cria as configurações (Upsert)
+        update_data = {}
+        if 'categories' in data: update_data['categories'] = data['categories']
+        if 'buyers' in data: update_data['buyers'] = data['buyers']
+        
         db.user_settings.update_one(
             {"user_id": ObjectId(current_user.id)},
-            {"$set": {"categories": data.get('categories', [])}},
+            {"$set": update_data},
             upsert=True
         )
         return jsonify({"status": "success"})
 
-    # GET
     settings = db.user_settings.find_one({"user_id": ObjectId(current_user.id)})
-    
     if not settings:
-        # Padrões se não existir configuração
-        default_categories = ["Alimentação", "Moradia", "Transporte", "Lazer", "Saúde", "Outros"]
-        return jsonify({"categories": default_categories})
-    
+        return jsonify({
+            "categories": ["Alimentação", "Moradia", "Transporte", "Lazer", "Saúde", "Outros"],
+            "buyers": ["Eu"]
+        })
     return jsonify(serialize_doc(settings))
 
-# 1. Cartões
+# Cartões
 @app.route('/api/cards', methods=['GET', 'POST'])
 @login_required
 def cards():
@@ -154,7 +139,63 @@ def cards():
     cards = list(db.credit_cards.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(c) for c in cards])
 
-# 2. Rendas
+# Lógica de Fatura (Invoice)
+@app.route('/api/cards/<card_id>/invoice', methods=['GET'])
+@login_required
+def card_invoice(card_id):
+    # Recebe o mês de referência da fatura (ex: '2023-10')
+    ref_month_str = request.args.get('month') 
+    if not ref_month_str:
+        return jsonify({"error": "Month required"}), 400
+
+    card = db.credit_cards.find_one({"_id": ObjectId(card_id), "user_id": ObjectId(current_user.id)})
+    if not card:
+        return jsonify({"error": "Card not found"}), 404
+
+    closing_day = card.get('closing_day', 1)
+    
+    # Data de referência (Mês da fatura)
+    ref_date = datetime.strptime(ref_month_str, '%Y-%m')
+    
+    # Cálculo do período da fatura:
+    # Fatura Mês X: Vai do dia (Closing+1) do Mês (X-1) até dia (Closing) do Mês X
+    
+    end_date = ref_date.replace(day=closing_day)
+    start_date = (end_date - relativedelta(months=1)) + timedelta(days=1)
+    
+    # Converter para string para busca no banco
+    start_str = start_date.strftime('%Y-%m-%d')
+    end_str = end_date.strftime('%Y-%m-%d')
+    
+    # Buscar gastos desse cartão nesse período
+    query = {
+        "user_id": ObjectId(current_user.id),
+        "card_id": ObjectId(card_id),
+        "date": {"$gte": start_str, "$lte": end_str}
+    }
+    
+    expenses = list(db.expenses.find(query).sort("date", -1))
+    
+    # Agrupar por comprador
+    buyers_summary = {}
+    total_amount = 0
+    
+    for exp in expenses:
+        amount = float(exp['amount'])
+        buyer = exp.get('buyer', 'Outros') or 'Outros'
+        
+        total_amount += amount
+        buyers_summary[buyer] = buyers_summary.get(buyer, 0) + amount
+        
+    return jsonify({
+        "card": serialize_doc(card),
+        "period": {"start": start_str, "end": end_str},
+        "total": total_amount,
+        "buyers_summary": buyers_summary,
+        "expenses": [serialize_doc(e) for e in expenses]
+    })
+
+# Rendas
 @app.route('/api/incomes', methods=['GET', 'POST'])
 @login_required
 def incomes():
@@ -174,13 +215,44 @@ def incomes():
     incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
-# 3. Gastos
+# Gastos (CRUD Completo)
 @app.route('/api/expenses', methods=['GET', 'POST'])
+@app.route('/api/expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
-def expenses():
+def expenses(expense_id=None):
+    # DELETE
+    if request.method == 'DELETE':
+        db.expenses.delete_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)})
+        return jsonify({"status": "deleted"})
+
+    # PUT (Editar)
+    if request.method == 'PUT':
+        data = request.json
+        card_id = data.get('card_id')
+        if card_id == "": card_id = None
+        
+        update_data = {
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "category": data.get('category', 'Geral'),
+            "date": data['date'],
+            "establishment": data.get('establishment'),
+            "buyer": data.get('buyer'),
+            "payment_method": data.get('payment_method'),
+            "card_id": ObjectId(card_id) if card_id else None,
+            "installments": data.get('installments'),
+            "observation": data.get('observation')
+        }
+        
+        db.expenses.update_one(
+            {"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)},
+            {"$set": update_data}
+        )
+        return jsonify({"status": "updated"})
+
+    # POST (Criar)
     if request.method == 'POST':
         data = request.json
-        
         card_id = data.get('card_id')
         if card_id == "": card_id = None
         
@@ -198,12 +270,11 @@ def expenses():
             "observation": data.get('observation'),
             "created_at": datetime.utcnow()
         }
-        
         result = db.expenses.insert_one(new_expense)
         new_expense['_id'] = result.inserted_id
         return jsonify([serialize_doc(new_expense)])
             
-    # GET com Filtros
+    # GET (Listar com Filtros)
     query = {"user_id": ObjectId(current_user.id)}
     
     search_term = request.args.get('search')
@@ -218,7 +289,6 @@ def expenses():
     
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    
     if start_date or end_date:
         date_query = {}
         if start_date: date_query["$gte"] = start_date
@@ -230,8 +300,7 @@ def expenses():
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})
-            if card:
-                expense['card_name'] = card['name']
+            if card: expense['card_name'] = card['name']
                 
     return jsonify([serialize_doc(e) for e in expenses])
 

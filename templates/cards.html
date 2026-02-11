@@ -20,9 +20,13 @@
         </header>
 
         <main>
-            <section class="input-section">
-                <h2>Adicionar Novo Cartão</h2>
-                <form id="card-form">
+            <!-- Seção de Cadastro de Cartão -->
+            <section class="input-section collapsed" id="new-card-section">
+                <div class="section-header" onclick="toggleNewCard()">
+                    <h2>Adicionar Novo Cartão</h2>
+                    <span class="toggle-icon">+</span>
+                </div>
+                <form id="card-form" style="display: none;">
                     <div class="form-row">
                         <div class="form-group">
                             <label>Nome do Cartão</label>
@@ -40,7 +44,7 @@
                         </div>
                         <div class="form-group">
                             <label>Dia Fechamento</label>
-                            <input type="number" id="card-closing" min="1" max="31">
+                            <input type="number" id="card-closing" min="1" max="31" required>
                         </div>
                         <div class="form-group">
                             <label>Dia Vencimento</label>
@@ -51,65 +55,64 @@
                 </form>
             </section>
 
+            <!-- Lista de Cartões -->
             <section class="cards-grid" id="cards-container">
                 <!-- Cards will be injected here -->
+            </section>
+
+            <!-- Detalhes da Fatura -->
+            <section class="invoice-section" id="invoice-section" style="display: none;">
+                <div class="invoice-header">
+                    <h2 id="invoice-card-name">Fatura Nubank</h2>
+                    <div class="invoice-controls">
+                        <input type="month" id="invoice-month">
+                        <button id="btn-load-invoice" class="btn-primary" style="width: auto; margin: 0;">Ver Fatura</button>
+                    </div>
+                </div>
+
+                <div class="invoice-summary">
+                    <div class="card">
+                        <h3>Total da Fatura</h3>
+                        <p id="invoice-total">R$ 0,00</p>
+                        <small id="invoice-period">Período: -- a --</small>
+                    </div>
+                    <div class="card">
+                        <h3>Por Comprador</h3>
+                        <div id="buyers-breakdown">
+                            <!-- JS populates -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <h3>Detalhamento</h3>
+                    <table id="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Comprador</th>
+                                <th>Parcela</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS populates -->
+                        </tbody>
+                    </table>
+                </div>
             </section>
         </main>
     </div>
 
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadCards();
-
-            document.getElementById('card-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const data = {
-                    name: document.getElementById('card-name').value,
-                    holder_name: document.getElementById('card-holder').value,
-                    limit_amount: document.getElementById('card-limit').value,
-                    closing_day: document.getElementById('card-closing').value,
-                    due_day: document.getElementById('card-due').value
-                };
-
-                try {
-                    const res = await fetch('/api/cards', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(data)
-                    });
-                    if (res.ok) {
-                        e.target.reset();
-                        loadCards();
-                    }
-                } catch (err) { console.error(err); }
-            });
-
-            async function loadCards() {
-                const res = await fetch('/api/cards');
-                const cards = await res.json();
-                const container = document.getElementById('cards-container');
-                container.innerHTML = '';
-
-                cards.forEach(card => {
-                    const el = document.createElement('div');
-                    el.className = 'credit-card-display';
-                    el.innerHTML = `
-                        <div class="card-header">
-                            <h3>${card.name}</h3>
-                            <span class="card-limit">R$ ${parseFloat(card.limit_amount).toFixed(2)}</span>
-                        </div>
-                        <div class="card-details">
-                            <p>Titular: ${card.holder_name || '-'}</p>
-                            <div class="card-dates">
-                                <span>Fecha dia: ${card.closing_day || '-'}</span>
-                                <span>Vence dia: ${card.due_day || '-'}</span>
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(el);
-                });
-            }
-        });
+        // Inline script for specific card page logic if needed, 
+        // but we will move most logic to script.js to keep it clean.
+        function toggleNewCard() {
+            const form = document.getElementById('card-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
     </script>
 </body>
 </html>
