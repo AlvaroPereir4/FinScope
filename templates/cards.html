@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meus Cartões - FinScope</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Fin<span>Scope</span></h1>
+            </div>
+            <div class="user-controls">
+                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <section class="input-section">
+                <h2>Adicionar Novo Cartão</h2>
+                <form id="card-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nome do Cartão</label>
+                            <input type="text" id="card-name" required placeholder="Ex: Nubank">
+                        </div>
+                        <div class="form-group">
+                            <label>Titular</label>
+                            <input type="text" id="card-holder" placeholder="Nome impresso">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Limite (R$)</label>
+                            <input type="number" id="card-limit" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Dia Fechamento</label>
+                            <input type="number" id="card-closing" min="1" max="31">
+                        </div>
+                        <div class="form-group">
+                            <label>Dia Vencimento</label>
+                            <input type="number" id="card-due" min="1" max="31">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary">Salvar Cartão</button>
+                </form>
+            </section>
+
+            <section class="cards-grid" id="cards-container">
+                <!-- Cards will be injected here -->
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCards();
+
+            document.getElementById('card-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const data = {
+                    name: document.getElementById('card-name').value,
+                    holder_name: document.getElementById('card-holder').value,
+                    limit_amount: document.getElementById('card-limit').value,
+                    closing_day: document.getElementById('card-closing').value,
+                    due_day: document.getElementById('card-due').value
+                };
+
+                try {
+                    const res = await fetch('/api/cards', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                    if (res.ok) {
+                        e.target.reset();
+                        loadCards();
+                    }
+                } catch (err) { console.error(err); }
+            });
+
+            async function loadCards() {
+                const res = await fetch('/api/cards');
+                const cards = await res.json();
+                const container = document.getElementById('cards-container');
+                container.innerHTML = '';
+
+                cards.forEach(card => {
+                    const el = document.createElement('div');
+                    el.className = 'credit-card-display';
+                    el.innerHTML = `
+                        <div class="card-header">
+                            <h3>${card.name}</h3>
+                            <span class="card-limit">R$ ${parseFloat(card.limit_amount).toFixed(2)}</span>
+                        </div>
+                        <div class="card-details">
+                            <p>Titular: ${card.holder_name || '-'}</p>
+                            <div class="card-dates">
+                                <span>Fecha dia: ${card.closing_day || '-'}</span>
+                                <span>Vence dia: ${card.due_day || '-'}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -15,6 +15,8 @@
                 <h1>Fin<span>Scope</span></h1>
             </div>
             <div class="user-controls">
+                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <span class="divider">|</span>
                 <span>Olá, {{ username }}</span>
                 <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
             </div>
@@ -43,6 +45,7 @@
             </section>
 
             <div class="actions-grid">
+                <!-- Renda -->
                 <section class="input-section">
                     <h2>Nova Renda</h2>
                     <form id="income-form">
@@ -62,32 +65,76 @@
                     </form>
                 </section>
 
+                <!-- Gasto Completo -->
                 <section class="input-section">
                     <h2>Novo Gasto</h2>
                     <form id="expense-form">
                         <div class="form-group">
                             <label>Descrição</label>
-                            <input type="text" id="exp-desc" required placeholder="Ex: Aluguel">
+                            <input type="text" id="exp-desc" required placeholder="Ex: Almoço">
                         </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Valor (R$)</label>
+                                <input type="number" id="exp-amount" step="0.01" required placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Data</label>
+                                <input type="date" id="exp-date" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Estabelecimento</label>
+                                <input type="text" id="exp-establishment" placeholder="Ex: Restaurante X">
+                            </div>
+                            <div class="form-group">
+                                <label>Categoria</label>
+                                <select id="exp-category">
+                                    <option value="Alimentação">Alimentação</option>
+                                    <option value="Moradia">Moradia</option>
+                                    <option value="Transporte">Transporte</option>
+                                    <option value="Lazer">Lazer</option>
+                                    <option value="Saúde">Saúde</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Método</label>
+                                <select id="exp-method" onchange="toggleCardSelect()">
+                                    <option value="debito">Débito</option>
+                                    <option value="credito">Crédito</option>
+                                    <option value="pix">PIX</option>
+                                    <option value="dinheiro">Dinheiro</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="card-select-group" style="display: none;">
+                                <label>Cartão</label>
+                                <select id="exp-card">
+                                    <option value="">Selecione...</option>
+                                    <!-- JS populates -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="installments-group" style="display: none;">
+                            <div class="form-group">
+                                <label>Parcelas</label>
+                                <input type="text" id="exp-installments" placeholder="Ex: 1/10">
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label>Categoria</label>
-                            <select id="exp-category">
-                                <option value="Moradia">Moradia</option>
-                                <option value="Alimentação">Alimentação</option>
-                                <option value="Transporte">Transporte</option>
-                                <option value="Lazer">Lazer</option>
-                                <option value="Outros">Outros</option>
-                            </select>
+                            <label>Observação</label>
+                            <input type="text" id="exp-obs" placeholder="Detalhes opcionais">
                         </div>
-                        <div class="form-group">
-                            <label>Valor (R$)</label>
-                            <input type="number" id="exp-amount" step="0.01" required placeholder="0.00">
-                        </div>
-                        <div class="form-group">
-                            <label>Data</label>
-                            <input type="date" id="exp-date" required>
-                        </div>
-                        <button type="submit" class="btn-primary" style="background-color: var(--danger-color);">Adicionar Gasto</button>
+
+                        <button type="submit" class="btn-primary btn-danger">Adicionar Gasto</button>
                     </form>
                 </section>
             </div>
@@ -101,6 +148,7 @@
                                 <th>Data</th>
                                 <th>Tipo</th>
                                 <th>Descrição</th>
+                                <th>Detalhes</th>
                                 <th>Valor</th>
                             </tr>
                         </thead>

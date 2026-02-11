@@ -62,6 +62,21 @@ header {
     gap: 1rem;
 }
 
+.nav-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-link:hover {
+    color: var(--accent-color);
+}
+
+.divider {
+    color: var(--border-color);
+}
+
 .btn-logout {
     color: var(--text-secondary);
     text-decoration: none;
@@ -70,7 +85,7 @@ header {
 }
 
 .btn-logout:hover {
-    color: var(--accent-color);
+    color: var(--danger-color);
 }
 
 /* Dashboard Grid */
@@ -126,7 +141,7 @@ header {
     margin-bottom: 2rem;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .actions-grid {
         grid-template-columns: 1fr;
     }
@@ -147,6 +162,12 @@ h2 {
 
 .form-group {
     margin-bottom: 1rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
 }
 
 label {
@@ -183,11 +204,16 @@ input:focus, select:focus {
     font-size: 1rem;
     font-weight: 600;
     width: 100%;
-    transition: background-color 0.2s;
+    transition: opacity 0.2s;
+    margin-top: 1rem;
 }
 
 .btn-primary:hover {
-    background-color: var(--accent-hover);
+    opacity: 0.9;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
 }
 
 /* Tables */
@@ -221,16 +247,118 @@ th {
 
 td {
     color: var(--text-primary);
+    vertical-align: middle;
 }
 
 tr:last-child td {
     border-bottom: none;
 }
 
-.amount-positive { color: var(--success-color); }
-.amount-negative { color: var(--danger-color); }
+.amount-positive { color: var(--success-color); font-weight: 600; }
+.amount-negative { color: var(--danger-color); font-weight: 600; }
 
-/* Login/Register Pages */
+.desc-sub {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Badges */
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge.card {
+    background-color: rgba(232, 124, 3, 0.15);
+    color: var(--accent-color);
+    border: 1px solid rgba(232, 124, 3, 0.3);
+}
+
+.badge.method {
+    background-color: rgba(143, 134, 129, 0.15);
+    color: var(--text-secondary);
+}
+
+.badge.installments {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    margin-left: 0.3rem;
+}
+
+/* Cards Page Grid */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.credit-card-display {
+    background: linear-gradient(135deg, #2a2827 0%, #1a1817 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.credit-card-display::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(232,124,3,0.1) 0%, rgba(0,0,0,0) 70%);
+    border-radius: 50%;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.card-header h3 {
+    font-size: 1.2rem;
+    color: #fff;
+    margin: 0;
+}
+
+.card-limit {
+    font-size: 0.9rem;
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.card-details {
+    margin-top: auto;
+}
+
+.card-details p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-dates {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 0.8rem;
+}
+
+/* Auth Pages */
 .auth-container {
     display: flex;
     justify-content: center;

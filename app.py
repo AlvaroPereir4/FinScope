@@ -1,42 +1,43 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 import os
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-import datetime
 from dotenv import load_dotenv
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from datetime import datetime, timedelta
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev_key_super_secret")
+app.secret_key = os.getenv("SECRET_KEY", "dev_key_mongo")
+
+# Configuração da Sessão (6 horas)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=6)
+
+# Configuração do MongoDB
+client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017/finscope"))
+db = client.get_database()
 
 # Configuração do Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-def get_db_connection():
-    client = MongoClient(os.getenv("DATABASE_URL"))
-    return client.get_default_database()
-
 class User(UserMixin):
-    def __init__(self, id, username, password_hash):
-        self.id = str(id)
-        self.username = username
-        self.password_hash = password_hash
+    def __init__(self, user_doc):
+        self.id = str(user_doc['_id'])
+        self.username = user_doc['username']
+        self.password_hash = user_doc['password_hash']
 
 @login_manager.user_loader
 def load_user(user_id):
-    db = get_db_connection()
     try:
         user_data = db.users.find_one({"_id": ObjectId(user_id)})
+        if user_data:
+            return User(user_data)
     except:
-        return None
-        
-    if user_data:
-        return User(user_data['_id'], user_data['username'], user_data['password_hash'])
+        pass
     return None
 
 # --- Rotas de Autenticação ---
@@ -47,11 +48,11 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        db = get_db_connection()
         user_data = db.users.find_one({"username": username})
         
         if user_data and check_password_hash(user_data['password_hash'], password):
-            user = User(user_data['_id'], user_data['username'], user_data['password_hash'])
+            user = User(user_data)
+            session.permanent = True  # Ativa a duração de 6 horas
             login_user(user)
             return redirect(url_for('index'))
         else:
@@ -65,14 +66,15 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        hashed_password = generate_password_hash(password)
-        
-        db = get_db_connection()
-        
         if db.users.find_one({"username": username}):
             flash('Nome de usuário já existe.')
         else:
-            db.users.insert_one({"username": username, "password_hash": hashed_password})
+            hashed_password = generate_password_hash(password)
+            db.users.insert_one({
+                "username": username,
+                "password_hash": hashed_password,
+                "created_at": datetime.utcnow()
+            })
             flash('Conta criada com sucesso! Faça login.')
             return redirect(url_for('login'))
             
@@ -91,82 +93,104 @@ def logout():
 def index():
     return render_template('index.html', username=current_user.username)
 
+@app.route('/cards')
+@login_required
+def cards_page():
+    return render_template('cards.html')
+
 # --- API Endpoints ---
 
+# Helper para serializar ObjectId e Datas
+def serialize_doc(doc):
+    if not doc: return None
+    doc['_id'] = str(doc['_id'])
+    if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
+    if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
+    return doc
+
+# 1. Cartões
+@app.route('/api/cards', methods=['GET', 'POST'])
+@login_required
+def cards():
+    if request.method == 'POST':
+        data = request.json
+        new_card = {
+            "user_id": ObjectId(current_user.id),
+            "name": data['name'],
+            "holder_name": data.get('holder_name'),
+            "limit_amount": float(data.get('limit_amount', 0)),
+            "closing_day": int(data.get('closing_day')) if data.get('closing_day') else None,
+            "due_day": int(data.get('due_day')) if data.get('due_day') else None,
+            "created_at": datetime.utcnow()
+        }
+        result = db.credit_cards.insert_one(new_card)
+        new_card['_id'] = result.inserted_id
+        return jsonify(serialize_doc(new_card))
+    
+    # GET
+    cards = list(db.credit_cards.find({"user_id": ObjectId(current_user.id)}))
+    return jsonify([serialize_doc(c) for c in cards])
+
+# 2. Rendas
 @app.route('/api/incomes', methods=['GET', 'POST'])
 @login_required
 def incomes():
-    db = get_db_connection()
-    
     if request.method == 'POST':
         data = request.json
-        try:
-            new_income = {
-                "user_id": current_user.id,
-                "description": data['description'],
-                "amount": float(data['amount']),
-                "date": data['date'],
-                "created_at": datetime.datetime.utcnow()
-            }
-            result = db.incomes.insert_one(new_income)
-            new_income['_id'] = str(result.inserted_id)
-            
-            # Format response
-            
-            return jsonify([new_income])
-        except Exception as e:
-            return jsonify({"error": str(e)}), 400
+        new_income = {
+            "user_id": ObjectId(current_user.id),
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "date": data['date'], # Mantendo como string YYYY-MM-DD para facilitar
+            "created_at": datetime.utcnow()
+        }
+        result = db.incomes.insert_one(new_income)
+        new_income['_id'] = result.inserted_id
+        return jsonify([serialize_doc(new_income)])
     
     # GET
-    try:
-        incomes_cursor = db.incomes.find({"user_id": current_user.id}).sort("date", -1)
-        incomes_list = list(incomes_cursor)
-        
-        for item in incomes_list:
-            item['_id'] = str(item['_id'])
-            # O MongoDB já guarda como float se inserirmos como float, mas garantindo:
-            item['amount'] = float(item.get('amount', 0))
-            
-        return jsonify(incomes_list)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
+    return jsonify([serialize_doc(i) for i in incomes])
 
+# 3. Gastos
 @app.route('/api/expenses', methods=['GET', 'POST'])
 @login_required
 def expenses():
-    db = get_db_connection()
-    
     if request.method == 'POST':
         data = request.json
-        try:
-            new_expense = {
-                "user_id": current_user.id,
-                "description": data['description'],
-                "amount": float(data['amount']),
-                "category": data.get('category', 'Geral'),
-                "date": data['date'],
-                "created_at": datetime.datetime.utcnow()
-            }
-            result = db.expenses.insert_one(new_expense)
-            new_expense['_id'] = str(result.inserted_id)
-            
-            
-            return jsonify([new_expense])
-        except Exception as e:
-            return jsonify({"error": str(e)}), 400
+        
+        card_id = data.get('card_id')
+        if card_id == "": card_id = None
+        
+        new_expense = {
+            "user_id": ObjectId(current_user.id),
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "category": data.get('category', 'Geral'),
+            "date": data['date'],
+            "establishment": data.get('establishment'),
+            "payment_method": data.get('payment_method'),
+            "card_id": ObjectId(card_id) if card_id else None,
+            "installments": data.get('installments'),
+            "observation": data.get('observation'),
+            "created_at": datetime.utcnow()
+        }
+        
+        result = db.expenses.insert_one(new_expense)
+        new_expense['_id'] = result.inserted_id
+        return jsonify([serialize_doc(new_expense)])
             
     # GET
-    try:
-        expenses_cursor = db.expenses.find({"user_id": current_user.id}).sort("date", -1)
-        expenses_list = list(expenses_cursor)
-        
-        for item in expenses_list:
-            item['_id'] = str(item['_id'])
-            item['amount'] = float(item.get('amount', 0))
-            
-        return jsonify(expenses_list)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    expenses = list(db.expenses.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
+    
+    # Enriquecer com nome do cartão (Join manual, já que Mongo não tem JOIN nativo simples)
+    for expense in expenses:
+        if expense.get('card_id'):
+            card = db.credit_cards.find_one({"_id": expense['card_id']})
+            if card:
+                expense['card_name'] = card['name']
+                
+    return jsonify([serialize_doc(e) for e in expenses])
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
