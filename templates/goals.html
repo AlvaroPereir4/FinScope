@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metas - FinScope</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Fin<span>Scope</span></h1>
+            </div>
+            <div class="user-controls">
+                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <span class="divider">|</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <section class="goals-section">
+                <div class="section-header">
+                    <h2>Minhas Metas</h2>
+                    <button class="btn-primary btn-small" onclick="openModal('goal-modal')">+ Nova Meta</button>
+                </div>
+
+                <div class="goals-grid" id="goals-container">
+                    <!-- JS populates -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Meta -->
+    <div id="goal-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="goal-modal-title">Nova Meta</h2>
+                <span class="close-modal" onclick="closeModal('goal-modal')">&times;</span>
+            </div>
+            <form id="goal-form">
+                <input type="hidden" id="goal-id">
+                <div class="form-group">
+                    <label>Objetivo</label>
+                    <input type="text" id="goal-title" required placeholder="Ex: Viagem Japão">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Meta</label>
+                    <select id="goal-type">
+                        <option value="saving">Acúmulo (Guardar)</option>
+                        <option value="spending">Teto de Gastos (Limite)</option>
+                        <option value="income">Meta de Renda (Ganhar)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor Alvo (R$)</label>
+                        <input type="number" id="goal-target" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Atual (R$)</label>
+                        <input type="number" id="goal-current" step="0.01" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data Limite</label>
+                    <input type="date" id="goal-deadline" required>
+                </div>
+                <button type="submit" class="btn-primary">Salvar Meta</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            document.getElementById('goal-form').reset();
+            document.getElementById('goal-id').value = '';
+            document.getElementById('goal-modal-title').textContent = 'Nova Meta';
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>

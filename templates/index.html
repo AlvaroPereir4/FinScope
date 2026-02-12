@@ -16,6 +16,7 @@
             </div>
             <div class="user-controls">
                 <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
                 <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
                 <span class="divider">|</span>
                 <button id="btn-settings" class="btn-icon" title="Configurações">⚙️</button>
@@ -26,6 +27,7 @@
         </header>
 
         <main>
+            <!-- Linha 1: Fluxo de Caixa -->
             <section class="dashboard-summary">
                 <div class="card income">
                     <h3>Renda Total</h3>
@@ -36,8 +38,20 @@
                     <p id="total-expense">R$ 0,00</p>
                 </div>
                 <div class="card">
-                    <h3>Saldo</h3>
+                    <h3>Saldo (Caixa)</h3>
                     <p id="balance">R$ 0,00</p>
+                </div>
+            </section>
+
+            <!-- Linha 2: Patrimônio -->
+            <section class="dashboard-summary">
+                <div class="card invest">
+                    <h3>Total Investido</h3>
+                    <p id="total-invested-dash" style="color: #3498db;">R$ 0,00</p>
+                </div>
+                <div class="card net-worth">
+                    <h3>Patrimônio Total</h3>
+                    <p id="net-worth" style="color: var(--accent-color);">R$ 0,00</p>
                 </div>
             </section>
 

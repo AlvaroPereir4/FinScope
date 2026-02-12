@@ -41,6 +41,7 @@ def serialize_doc(doc):
     doc['_id'] = str(doc['_id'])
     if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
     if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
+    if 'investment_id' in doc: doc['investment_id'] = str(doc['investment_id'])
     return doc
 
 # --- Rotas Auth ---
@@ -95,9 +96,13 @@ def cards_page():
 def investments_page():
     return render_template('investments.html')
 
+@app.route('/goals')
+@login_required
+def goals_page():
+    return render_template('goals.html')
+
 # --- API ---
 
-# Configurações
 @app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -106,23 +111,15 @@ def settings():
         update_data = {}
         if 'categories' in data: update_data['categories'] = data['categories']
         if 'buyers' in data: update_data['buyers'] = data['buyers']
-        
-        db.user_settings.update_one(
-            {"user_id": ObjectId(current_user.id)},
-            {"$set": update_data},
-            upsert=True
-        )
+        db.user_settings.update_one({"user_id": ObjectId(current_user.id)}, {"$set": update_data}, upsert=True)
         return jsonify({"status": "success"})
 
     settings = db.user_settings.find_one({"user_id": ObjectId(current_user.id)})
     if not settings:
-        return jsonify({
-            "categories": ["Alimentação", "Moradia", "Transporte", "Lazer", "Saúde", "Outros"],
-            "buyers": ["Eu"]
-        })
+        return jsonify({"categories": ["Alimentação", "Moradia", "Transporte"], "buyers": ["Eu"]})
     return jsonify(serialize_doc(settings))
 
-# Cartões e Fatura
+# --- Cartões ---
 @app.route('/api/cards', methods=['GET', 'POST'])
 @login_required
 def cards():
@@ -133,14 +130,13 @@ def cards():
             "name": data['name'],
             "holder_name": data.get('holder_name'),
             "limit_amount": float(data.get('limit_amount', 0)),
-            "closing_day": int(data.get('closing_day')) if data.get('closing_day') else None,
-            "due_day": int(data.get('due_day')) if data.get('due_day') else None,
+            "closing_day": int(data.get('closing_day')),
+            "due_day": int(data.get('due_day')),
             "created_at": datetime.utcnow()
         }
-        result = db.credit_cards.insert_one(new_card)
-        new_card['_id'] = result.inserted_id
+        res = db.credit_cards.insert_one(new_card)
+        new_card['_id'] = res.inserted_id
         return jsonify(serialize_doc(new_card))
-    
     cards = list(db.credit_cards.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(c) for c in cards])
 
@@ -149,30 +145,23 @@ def cards():
 def card_invoice(card_id):
     ref_month_str = request.args.get('month') 
     if not ref_month_str: return jsonify({"error": "Month required"}), 400
-
     card = db.credit_cards.find_one({"_id": ObjectId(card_id), "user_id": ObjectId(current_user.id)})
     if not card: return jsonify({"error": "Card not found"}), 404
-
+    
     closing_day = card.get('closing_day', 1)
     ref_date = datetime.strptime(ref_month_str, '%Y-%m')
-    
     end_date = ref_date.replace(day=closing_day)
     start_date = (end_date - relativedelta(months=1)) + timedelta(days=1)
-    
-    start_str = start_date.strftime('%Y-%m-%d')
-    end_str = end_date.strftime('%Y-%m-%d')
     
     query = {
         "user_id": ObjectId(current_user.id),
         "card_id": ObjectId(card_id),
-        "date": {"$gte": start_str, "$lte": end_str}
+        "date": {"$gte": start_date.strftime('%Y-%m-%d'), "$lte": end_date.strftime('%Y-%m-%d')}
     }
-    
     expenses = list(db.expenses.find(query).sort("date", -1))
     
     buyers_summary = {}
     total_amount = 0
-    
     for exp in expenses:
         amount = float(exp['amount'])
         buyer = exp.get('buyer', 'Outros') or 'Outros'
@@ -181,13 +170,13 @@ def card_invoice(card_id):
         
     return jsonify({
         "card": serialize_doc(card),
-        "period": {"start": start_str, "end": end_str},
+        "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')},
         "total": total_amount,
         "buyers_summary": buyers_summary,
         "expenses": [serialize_doc(e) for e in expenses]
     })
 
-# Rendas
+# --- Rendas e Gastos ---
 @app.route('/api/incomes', methods=['GET', 'POST'])
 @login_required
 def incomes():
@@ -200,14 +189,12 @@ def incomes():
             "date": data['date'],
             "created_at": datetime.utcnow()
         }
-        result = db.incomes.insert_one(new_income)
-        new_income['_id'] = result.inserted_id
+        res = db.incomes.insert_one(new_income)
+        new_income['_id'] = res.inserted_id
         return jsonify([serialize_doc(new_income)])
-    
     incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
-# Gastos
 @app.route('/api/expenses', methods=['GET', 'POST'])
 @app.route('/api/expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -219,8 +206,6 @@ def expenses(expense_id=None):
     if request.method == 'PUT':
         data = request.json
         card_id = data.get('card_id')
-        if card_id == "": card_id = None
-        
         update_data = {
             "description": data['description'],
             "amount": float(data['amount']),
@@ -239,8 +224,6 @@ def expenses(expense_id=None):
     if request.method == 'POST':
         data = request.json
         card_id = data.get('card_id')
-        if card_id == "": card_id = None
-        
         new_expense = {
             "user_id": ObjectId(current_user.id),
             "description": data['description'],
@@ -255,8 +238,8 @@ def expenses(expense_id=None):
             "observation": data.get('observation'),
             "created_at": datetime.utcnow()
         }
-        result = db.expenses.insert_one(new_expense)
-        new_expense['_id'] = result.inserted_id
+        res = db.expenses.insert_one(new_expense)
+        new_expense['_id'] = res.inserted_id
         return jsonify([serialize_doc(new_expense)])
             
     query = {"user_id": ObjectId(current_user.id)}
@@ -268,20 +251,18 @@ def expenses(expense_id=None):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date or end_date:
-        date_query = {}
-        if start_date: date_query["$gte"] = start_date
-        if end_date: date_query["$lte"] = end_date
-        query["date"] = date_query
+        query["date"] = {}
+        if start_date: query["date"]["$gte"] = start_date
+        if end_date: query["date"]["$lte"] = end_date
 
     expenses = list(db.expenses.find(query).sort("date", -1))
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})
             if card: expense['card_name'] = card['name']
-                
     return jsonify([serialize_doc(e) for e in expenses])
 
-# --- NOVAS ROTAS: Investimentos e Metas ---
+# --- INVESTIMENTOS ---
 
 @app.route('/api/investments', methods=['GET', 'POST'])
 @app.route('/api/investments/<inv_id>', methods=['PUT', 'DELETE'])
@@ -289,6 +270,7 @@ def expenses(expense_id=None):
 def investments(inv_id=None):
     if request.method == 'DELETE':
         db.investments.delete_one({"_id": ObjectId(inv_id), "user_id": ObjectId(current_user.id)})
+        db.investment_entries.delete_many({"investment_id": ObjectId(inv_id)})
         return jsonify({"status": "deleted"})
         
     if request.method == 'PUT':
@@ -298,7 +280,7 @@ def investments(inv_id=None):
             {"$set": {
                 "name": data['name'],
                 "type": data['type'],
-                "amount": float(data['amount']),
+                "target_amount": float(data.get('target_amount', 0)),
                 "updated_at": datetime.utcnow()
             }}
         )
@@ -310,7 +292,8 @@ def investments(inv_id=None):
             "user_id": ObjectId(current_user.id),
             "name": data['name'],
             "type": data['type'],
-            "amount": float(data['amount']),
+            "current_amount": float(data.get('current_amount', 0)),
+            "target_amount": float(data.get('target_amount', 0)),
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
@@ -318,10 +301,54 @@ def investments(inv_id=None):
         new_inv['_id'] = res.inserted_id
         return jsonify(serialize_doc(new_inv))
 
-    # GET
     invs = list(db.investments.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(i) for i in invs])
 
+# Histórico Global de Investimentos (Para o Gráfico)
+@app.route('/api/investments/history', methods=['GET'])
+@login_required
+def investments_history():
+    # Retorna todas as entradas de investimento do usuário
+    entries = list(db.investment_entries.find({"user_id": ObjectId(current_user.id)}).sort("date", 1))
+    return jsonify([serialize_doc(e) for e in entries])
+
+@app.route('/api/investments/<inv_id>/entries', methods=['GET', 'POST'])
+@login_required
+def investment_entries(inv_id):
+    if request.method == 'POST':
+        data = request.json
+        amount = float(data['amount'])
+        entry_type = data['type'] 
+        
+        new_entry = {
+            "user_id": ObjectId(current_user.id),
+            "investment_id": ObjectId(inv_id),
+            "type": entry_type,
+            "amount": amount,
+            "date": data['date'],
+            "created_at": datetime.utcnow()
+        }
+        db.investment_entries.insert_one(new_entry)
+        
+        inv = db.investments.find_one({"_id": ObjectId(inv_id)})
+        current_val = float(inv.get('current_amount', 0))
+        
+        # Lógica de Saldo: Aporte (+) Rendimento (+) Saque (-)
+        if entry_type == 'withdrawal':
+            new_val = current_val - amount
+        else:
+            new_val = current_val + amount
+        
+        db.investments.update_one(
+            {"_id": ObjectId(inv_id)},
+            {"$set": {"current_amount": new_val, "updated_at": datetime.utcnow()}}
+        )
+        return jsonify({"status": "success", "new_balance": new_val})
+
+    entries = list(db.investment_entries.find({"investment_id": ObjectId(inv_id)}).sort("date", -1))
+    return jsonify([serialize_doc(e) for e in entries])
+
+# --- METAS ---
 @app.route('/api/goals', methods=['GET', 'POST'])
 @app.route('/api/goals/<goal_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -336,6 +363,7 @@ def goals(goal_id=None):
             {"_id": ObjectId(goal_id), "user_id": ObjectId(current_user.id)},
             {"$set": {
                 "title": data['title'],
+                "type": data.get('type', 'spending'),
                 "target_amount": float(data['target_amount']),
                 "current_amount": float(data['current_amount']),
                 "deadline": data['deadline']
@@ -348,6 +376,7 @@ def goals(goal_id=None):
         new_goal = {
             "user_id": ObjectId(current_user.id),
             "title": data['title'],
+            "type": data.get('type', 'spending'),
             "target_amount": float(data['target_amount']),
             "current_amount": float(data.get('current_amount', 0)),
             "deadline": data['deadline'],
@@ -357,7 +386,6 @@ def goals(goal_id=None):
         new_goal['_id'] = res.inserted_id
         return jsonify(serialize_doc(new_goal))
 
-    # GET
     goals = list(db.goals.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(g) for g in goals])
 

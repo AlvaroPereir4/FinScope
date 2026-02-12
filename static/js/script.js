@@ -40,7 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Investments & Goals Elements
     const investmentForm = document.getElementById('investment-form');
     const goalForm = document.getElementById('goal-form');
-    const investmentsTable = document.querySelector('#investments-table tbody');
+    const entryForm = document.getElementById('entry-form');
+    const investmentsContainer = document.getElementById('investments-container');
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
 
@@ -69,8 +70,11 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCardsPage();
     }
 
-    if(document.getElementById('investments-table')) {
+    if(document.getElementById('investments-container')) {
         loadInvestments();
+    }
+
+    if(document.getElementById('goals-container')) {
         loadGoals();
     }
 
@@ -118,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = {
                 name: document.getElementById('inv-name').value,
                 type: document.getElementById('inv-type').value,
-                amount: parseFloat(document.getElementById('inv-amount').value)
+                current_amount: parseFloat(document.getElementById('inv-current').value),
+                target_amount: parseFloat(document.getElementById('inv-target').value || 0)
             };
             
             const url = id ? `/api/investments/${id}` : '/api/investments';
@@ -138,12 +143,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if(entryForm) {
+        entryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const invId = document.getElementById('entry-inv-id').value;
+            const data = {
+                type: document.getElementById('entry-type').value,
+                amount: parseFloat(document.getElementById('entry-amount').value),
+                date: document.getElementById('entry-date').value
+            };
+            
+            try {
+                const res = await fetch(`/api/investments/${invId}/entries`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if(res.ok) {
+                    document.getElementById('entry-modal').style.display = 'none';
+                    loadInvestments(); // Refresh balances
+                }
+            } catch(err) { console.error(err); }
+        });
+    }
+
     if(goalForm) {
         goalForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('goal-id').value;
             const data = {
                 title: document.getElementById('goal-title').value,
+                type: document.getElementById('goal-type').value,
                 target_amount: parseFloat(document.getElementById('goal-target').value),
                 current_amount: parseFloat(document.getElementById('goal-current').value),
                 deadline: document.getElementById('goal-deadline').value
@@ -271,29 +301,44 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/investments');
             const invs = await res.json();
             
-            investmentsTable.innerHTML = '';
+            investmentsContainer.innerHTML = '';
             let total = 0;
             
             invs.forEach(inv => {
-                total += inv.amount;
-                const row = document.createElement('tr');
+                total += inv.current_amount;
                 const invStr = encodeURIComponent(JSON.stringify(inv));
                 
-                row.innerHTML = `
-                    <td>${inv.name}</td>
-                    <td><span class="badge method">${inv.type}</span></td>
-                    <td class="amount-positive">${formatCurrency(inv.amount)}</td>
-                    <td>
-                        <button class="btn-icon-small edit" onclick="editInvestment('${invStr}')">✎</button>
-                        <button class="btn-icon-small delete" onclick="deleteInvestment('${inv._id}')">🗑</button>
-                    </td>
+                const el = document.createElement('div');
+                el.className = 'credit-card-display'; // Reusing card style
+                el.style.cursor = 'pointer';
+                el.onclick = (e) => {
+                    if(e.target.tagName !== 'BUTTON') openEntryModal(inv._id);
+                };
+                
+                el.innerHTML = `
+                    <div class="card-header">
+                        <h3>${inv.name}</h3>
+                        <span class="card-limit">${formatCurrency(inv.current_amount)}</span>
+                    </div>
+                    <div class="card-details">
+                        <p>${inv.type}</p>
+                        <div class="card-dates">
+                            <button class="btn-icon-small edit" onclick="editInvestment('${invStr}')">✎</button>
+                            <button class="btn-icon-small delete" onclick="deleteInvestment('${inv._id}')">🗑</button>
+                        </div>
+                    </div>
                 `;
-                investmentsTable.appendChild(row);
+                investmentsContainer.appendChild(el);
             });
             
             totalInvestedEl.textContent = formatCurrency(total);
         } catch(err) { console.error(err); }
     }
+
+    window.openEntryModal = function(invId) {
+        document.getElementById('entry-inv-id').value = invId;
+        document.getElementById('entry-modal').style.display = 'flex';
+    };
 
     async function loadGoals() {
         try {
@@ -335,7 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('inv-id').value = inv._id;
         document.getElementById('inv-name').value = inv.name;
         document.getElementById('inv-type').value = inv.type;
-        document.getElementById('inv-amount').value = inv.amount;
+        document.getElementById('inv-current').value = inv.current_amount;
+        document.getElementById('inv-target').value = inv.target_amount || '';
         document.getElementById('inv-modal-title').textContent = 'Editar Investimento';
         document.getElementById('investment-modal').style.display = 'flex';
     };
@@ -350,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const goal = JSON.parse(decodeURIComponent(goalStr));
         document.getElementById('goal-id').value = goal._id;
         document.getElementById('goal-title').value = goal.title;
+        document.getElementById('goal-type').value = goal.type || 'saving';
         document.getElementById('goal-target').value = goal.target_amount;
         document.getElementById('goal-current').value = goal.current_amount;
         document.getElementById('goal-deadline').value = goal.deadline;
@@ -584,17 +631,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 expenseUrl += `?${params.toString()}`;
             }
 
-            const [incomesRes, expensesRes] = await Promise.all([
+            const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes] = await Promise.all([
                 fetch('/api/incomes'), 
-                fetch(expenseUrl)
+                fetch(expenseUrl),
+                fetch('/api/investments/history'),
+                fetch('/api/investments') // Get current balances for Net Worth
             ]);
 
             const incomes = await incomesRes.json();
             const expenses = await expensesRes.json();
+            const investmentsHistory = await investmentsRes.json();
+            const currentInvestments = await allInvestmentsRes.json();
 
             if (!isSearch) {
-                updateDashboard(incomes, expenses);
-                updateChart(incomes, expenses);
+                updateDashboard(incomes, expenses, currentInvestments);
+                updateChart(incomes, expenses, investmentsHistory);
             }
             
             updateTable(incomes, expenses, isSearch);
@@ -616,16 +667,25 @@ document.addEventListener('DOMContentLoaded', () => {
         searchCount.textContent = expenses.length;
     }
 
-    function updateDashboard(incomes, expenses) {
+    function updateDashboard(incomes, expenses, currentInvestments) {
+        // 1. Fluxo de Caixa
         const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
         const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
         const balance = totalIncome - totalExpense;
 
         document.getElementById('total-income').textContent = formatCurrency(totalIncome);
         document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
+        
         const balanceEl = document.getElementById('balance');
         balanceEl.textContent = formatCurrency(balance);
         balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+
+        // 2. Patrimônio
+        const totalInvested = currentInvestments.reduce((sum, inv) => sum + inv.current_amount, 0);
+        const netWorth = balance + totalInvested;
+
+        document.getElementById('total-invested-dash').textContent = formatCurrency(totalInvested);
+        document.getElementById('net-worth').textContent = formatCurrency(netWorth);
     }
 
     function updateTable(incomes, expenses, isSearch) {
@@ -688,24 +748,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateChart(incomes, expenses) {
+    function updateChart(incomes, expenses, investments) {
         const ctx = document.getElementById('financeChart').getContext('2d');
         const monthlyData = {};
+        
+        // Process Incomes & Expenses
         [...incomes, ...expenses].forEach(item => {
             const monthKey = item.date.substring(0, 7);
-            if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0 };
+            if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0, investment: 0 };
             if (incomes.includes(item)) monthlyData[monthKey].income += item.amount;
             else monthlyData[monthKey].expense += item.amount;
         });
+
+        // Process Investments (Only contributions count as "spending" for chart visualization)
+        investments.forEach(inv => {
+            if(inv.type === 'contribution') {
+                const monthKey = inv.date.substring(0, 7);
+                if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0, investment: 0 };
+                monthlyData[monthKey].investment += inv.amount;
+            }
+        });
+
         const sortedMonths = Object.keys(monthlyData).sort();
+        
         if (financeChart) financeChart.destroy();
+        
         financeChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: sortedMonths.map(m => { const [y, mo] = m.split('-'); return `${mo}/${y}`; }),
                 datasets: [
-                    { label: 'Rendas', data: sortedMonths.map(m => monthlyData[m].income), backgroundColor: '#2ecc71', borderRadius: 4 },
-                    { label: 'Gastos', data: sortedMonths.map(m => monthlyData[m].expense), backgroundColor: '#e74c3c', borderRadius: 4 }
+                    { 
+                        label: 'Rendas', 
+                        data: sortedMonths.map(m => monthlyData[m].income), 
+                        backgroundColor: '#2ecc71', 
+                        borderRadius: 4 
+                    },
+                    { 
+                        label: 'Gastos', 
+                        data: sortedMonths.map(m => monthlyData[m].expense), 
+                        backgroundColor: '#e74c3c', 
+                        borderRadius: 4 
+                    },
+                    { 
+                        label: 'Investido', 
+                        data: sortedMonths.map(m => monthlyData[m].investment), 
+                        backgroundColor: '#3498db', 
+                        borderRadius: 4 
+                    }
                 ]
             },
             options: {

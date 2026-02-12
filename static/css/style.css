@@ -15,6 +15,7 @@
     --border-color: #2a2827;
     --success-color: #2ecc71;
     --danger-color: #e74c3c;
+    --invest-color: #3498db;
 }
 
 * {
@@ -131,6 +132,8 @@ header {
 
 .card.income p { color: var(--success-color); }
 .card.expense p { color: var(--danger-color); }
+.card.invest p { color: var(--invest-color); }
+.card.net-worth p { color: var(--accent-color); }
 
 /* Charts */
 .charts-container {
@@ -418,8 +421,8 @@ tr:last-child td {
     margin-left: 0.3rem;
 }
 
-/* Cards Page Grid */
-.cards-grid {
+/* Cards & Investments Grid */
+.cards-grid, .investments-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 1.5rem;
