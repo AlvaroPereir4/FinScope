@@ -90,9 +90,14 @@ def index():
 def cards_page():
     return render_template('cards.html')
 
+@app.route('/investments')
+@login_required
+def investments_page():
+    return render_template('investments.html')
+
 # --- API ---
 
-# Configurações (Categorias e Compradores)
+# Configurações
 @app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -117,7 +122,7 @@ def settings():
         })
     return jsonify(serialize_doc(settings))
 
-# Cartões
+# Cartões e Fatura
 @app.route('/api/cards', methods=['GET', 'POST'])
 @login_required
 def cards():
@@ -139,35 +144,24 @@ def cards():
     cards = list(db.credit_cards.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(c) for c in cards])
 
-# Lógica de Fatura (Invoice)
 @app.route('/api/cards/<card_id>/invoice', methods=['GET'])
 @login_required
 def card_invoice(card_id):
-    # Recebe o mês de referência da fatura (ex: '2023-10')
     ref_month_str = request.args.get('month') 
-    if not ref_month_str:
-        return jsonify({"error": "Month required"}), 400
+    if not ref_month_str: return jsonify({"error": "Month required"}), 400
 
     card = db.credit_cards.find_one({"_id": ObjectId(card_id), "user_id": ObjectId(current_user.id)})
-    if not card:
-        return jsonify({"error": "Card not found"}), 404
+    if not card: return jsonify({"error": "Card not found"}), 404
 
     closing_day = card.get('closing_day', 1)
-    
-    # Data de referência (Mês da fatura)
     ref_date = datetime.strptime(ref_month_str, '%Y-%m')
-    
-    # Cálculo do período da fatura:
-    # Fatura Mês X: Vai do dia (Closing+1) do Mês (X-1) até dia (Closing) do Mês X
     
     end_date = ref_date.replace(day=closing_day)
     start_date = (end_date - relativedelta(months=1)) + timedelta(days=1)
     
-    # Converter para string para busca no banco
     start_str = start_date.strftime('%Y-%m-%d')
     end_str = end_date.strftime('%Y-%m-%d')
     
-    # Buscar gastos desse cartão nesse período
     query = {
         "user_id": ObjectId(current_user.id),
         "card_id": ObjectId(card_id),
@@ -176,14 +170,12 @@ def card_invoice(card_id):
     
     expenses = list(db.expenses.find(query).sort("date", -1))
     
-    # Agrupar por comprador
     buyers_summary = {}
     total_amount = 0
     
     for exp in expenses:
         amount = float(exp['amount'])
         buyer = exp.get('buyer', 'Outros') or 'Outros'
-        
         total_amount += amount
         buyers_summary[buyer] = buyers_summary.get(buyer, 0) + amount
         
@@ -215,17 +207,15 @@ def incomes():
     incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
-# Gastos (CRUD Completo)
+# Gastos
 @app.route('/api/expenses', methods=['GET', 'POST'])
 @app.route('/api/expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
 def expenses(expense_id=None):
-    # DELETE
     if request.method == 'DELETE':
         db.expenses.delete_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)})
         return jsonify({"status": "deleted"})
 
-    # PUT (Editar)
     if request.method == 'PUT':
         data = request.json
         card_id = data.get('card_id')
@@ -243,14 +233,9 @@ def expenses(expense_id=None):
             "installments": data.get('installments'),
             "observation": data.get('observation')
         }
-        
-        db.expenses.update_one(
-            {"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)},
-            {"$set": update_data}
-        )
+        db.expenses.update_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
         return jsonify({"status": "updated"})
 
-    # POST (Criar)
     if request.method == 'POST':
         data = request.json
         card_id = data.get('card_id')
@@ -274,18 +259,11 @@ def expenses(expense_id=None):
         new_expense['_id'] = result.inserted_id
         return jsonify([serialize_doc(new_expense)])
             
-    # GET (Listar com Filtros)
     query = {"user_id": ObjectId(current_user.id)}
-    
     search_term = request.args.get('search')
     if search_term:
         regex = re.compile(search_term, re.IGNORECASE)
-        query["$or"] = [
-            {"description": regex},
-            {"establishment": regex},
-            {"category": regex},
-            {"buyer": regex}
-        ]
+        query["$or"] = [{"description": regex}, {"establishment": regex}, {"category": regex}, {"buyer": regex}]
     
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -296,13 +274,92 @@ def expenses(expense_id=None):
         query["date"] = date_query
 
     expenses = list(db.expenses.find(query).sort("date", -1))
-    
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})
             if card: expense['card_name'] = card['name']
                 
     return jsonify([serialize_doc(e) for e in expenses])
+
+# --- NOVAS ROTAS: Investimentos e Metas ---
+
+@app.route('/api/investments', methods=['GET', 'POST'])
+@app.route('/api/investments/<inv_id>', methods=['PUT', 'DELETE'])
+@login_required
+def investments(inv_id=None):
+    if request.method == 'DELETE':
+        db.investments.delete_one({"_id": ObjectId(inv_id), "user_id": ObjectId(current_user.id)})
+        return jsonify({"status": "deleted"})
+        
+    if request.method == 'PUT':
+        data = request.json
+        db.investments.update_one(
+            {"_id": ObjectId(inv_id), "user_id": ObjectId(current_user.id)},
+            {"$set": {
+                "name": data['name'],
+                "type": data['type'],
+                "amount": float(data['amount']),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        return jsonify({"status": "updated"})
+
+    if request.method == 'POST':
+        data = request.json
+        new_inv = {
+            "user_id": ObjectId(current_user.id),
+            "name": data['name'],
+            "type": data['type'],
+            "amount": float(data['amount']),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        res = db.investments.insert_one(new_inv)
+        new_inv['_id'] = res.inserted_id
+        return jsonify(serialize_doc(new_inv))
+
+    # GET
+    invs = list(db.investments.find({"user_id": ObjectId(current_user.id)}))
+    return jsonify([serialize_doc(i) for i in invs])
+
+@app.route('/api/goals', methods=['GET', 'POST'])
+@app.route('/api/goals/<goal_id>', methods=['PUT', 'DELETE'])
+@login_required
+def goals(goal_id=None):
+    if request.method == 'DELETE':
+        db.goals.delete_one({"_id": ObjectId(goal_id), "user_id": ObjectId(current_user.id)})
+        return jsonify({"status": "deleted"})
+
+    if request.method == 'PUT':
+        data = request.json
+        db.goals.update_one(
+            {"_id": ObjectId(goal_id), "user_id": ObjectId(current_user.id)},
+            {"$set": {
+                "title": data['title'],
+                "target_amount": float(data['target_amount']),
+                "current_amount": float(data['current_amount']),
+                "deadline": data['deadline']
+            }}
+        )
+        return jsonify({"status": "updated"})
+
+    if request.method == 'POST':
+        data = request.json
+        new_goal = {
+            "user_id": ObjectId(current_user.id),
+            "title": data['title'],
+            "target_amount": float(data['target_amount']),
+            "current_amount": float(data.get('current_amount', 0)),
+            "deadline": data['deadline'],
+            "created_at": datetime.utcnow()
+        }
+        res = db.goals.insert_one(new_goal)
+        new_goal['_id'] = res.inserted_id
+        return jsonify(serialize_doc(new_goal))
+
+    # GET
+    goals = list(db.goals.find({"user_id": ObjectId(current_user.id)}))
+    return jsonify([serialize_doc(g) for g in goals])
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -37,6 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const invoiceMonthInput = document.getElementById('invoice-month');
     const btnLoadInvoice = document.getElementById('btn-load-invoice');
     
+    // Investments & Goals Elements
+    const investmentForm = document.getElementById('investment-form');
+    const goalForm = document.getElementById('goal-form');
+    const investmentsTable = document.querySelector('#investments-table tbody');
+    const goalsContainer = document.getElementById('goals-container');
+    const totalInvestedEl = document.getElementById('total-invested');
+
     // State
     let currentCategories = [];
     let currentBuyers = [];
@@ -58,9 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
         loadSettings();
     }
     
-    // Load Cards Page Logic
     if(document.getElementById('cards-container')) {
         loadCardsPage();
+    }
+
+    if(document.getElementById('investments-table')) {
+        loadInvestments();
+        loadGoals();
     }
 
     // --- Event Listeners ---
@@ -96,6 +107,62 @@ document.addEventListener('DOMContentLoaded', () => {
         btnLoadInvoice.addEventListener('click', () => {
             const cardId = invoiceSection.dataset.cardId;
             loadInvoice(cardId);
+        });
+    }
+
+    // Investments & Goals Events
+    if(investmentForm) {
+        investmentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('inv-id').value;
+            const data = {
+                name: document.getElementById('inv-name').value,
+                type: document.getElementById('inv-type').value,
+                amount: parseFloat(document.getElementById('inv-amount').value)
+            };
+            
+            const url = id ? `/api/investments/${id}` : '/api/investments';
+            const method = id ? 'PUT' : 'POST';
+            
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if(res.ok) {
+                    document.getElementById('investment-modal').style.display = 'none';
+                    loadInvestments();
+                }
+            } catch(err) { console.error(err); }
+        });
+    }
+
+    if(goalForm) {
+        goalForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('goal-id').value;
+            const data = {
+                title: document.getElementById('goal-title').value,
+                target_amount: parseFloat(document.getElementById('goal-target').value),
+                current_amount: parseFloat(document.getElementById('goal-current').value),
+                deadline: document.getElementById('goal-deadline').value
+            };
+            
+            const url = id ? `/api/goals/${id}` : '/api/goals';
+            const method = id ? 'PUT' : 'POST';
+            
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if(res.ok) {
+                    document.getElementById('goal-modal').style.display = 'none';
+                    loadGoals();
+                }
+            } catch(err) { console.error(err); }
         });
     }
 
@@ -196,6 +263,105 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // --- Investments & Goals Logic ---
+
+    async function loadInvestments() {
+        try {
+            const res = await fetch('/api/investments');
+            const invs = await res.json();
+            
+            investmentsTable.innerHTML = '';
+            let total = 0;
+            
+            invs.forEach(inv => {
+                total += inv.amount;
+                const row = document.createElement('tr');
+                const invStr = encodeURIComponent(JSON.stringify(inv));
+                
+                row.innerHTML = `
+                    <td>${inv.name}</td>
+                    <td><span class="badge method">${inv.type}</span></td>
+                    <td class="amount-positive">${formatCurrency(inv.amount)}</td>
+                    <td>
+                        <button class="btn-icon-small edit" onclick="editInvestment('${invStr}')">✎</button>
+                        <button class="btn-icon-small delete" onclick="deleteInvestment('${inv._id}')">🗑</button>
+                    </td>
+                `;
+                investmentsTable.appendChild(row);
+            });
+            
+            totalInvestedEl.textContent = formatCurrency(total);
+        } catch(err) { console.error(err); }
+    }
+
+    async function loadGoals() {
+        try {
+            const res = await fetch('/api/goals');
+            const goals = await res.json();
+            
+            goalsContainer.innerHTML = '';
+            
+            goals.forEach(goal => {
+                const percent = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
+                const goalStr = encodeURIComponent(JSON.stringify(goal));
+                
+                const el = document.createElement('div');
+                el.className = 'goal-card';
+                el.innerHTML = `
+                    <div class="goal-header">
+                        <h3>${goal.title}</h3>
+                        <div class="goal-actions">
+                            <button class="btn-icon-small edit" onclick="editGoal('${goalStr}')">✎</button>
+                            <button class="btn-icon-small delete" onclick="deleteGoal('${goal._id}')">🗑</button>
+                        </div>
+                    </div>
+                    <div class="goal-progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%"></div>
+                    </div>
+                    <div class="goal-stats">
+                        <span>${formatCurrency(goal.current_amount)} / ${formatCurrency(goal.target_amount)}</span>
+                        <span>${percent.toFixed(1)}%</span>
+                    </div>
+                    <div class="goal-deadline">Meta: ${formatDate(goal.deadline)}</div>
+                `;
+                goalsContainer.appendChild(el);
+            });
+        } catch(err) { console.error(err); }
+    }
+
+    window.editInvestment = function(invStr) {
+        const inv = JSON.parse(decodeURIComponent(invStr));
+        document.getElementById('inv-id').value = inv._id;
+        document.getElementById('inv-name').value = inv.name;
+        document.getElementById('inv-type').value = inv.type;
+        document.getElementById('inv-amount').value = inv.amount;
+        document.getElementById('inv-modal-title').textContent = 'Editar Investimento';
+        document.getElementById('investment-modal').style.display = 'flex';
+    };
+
+    window.deleteInvestment = async function(id) {
+        if(!confirm('Excluir este investimento?')) return;
+        await fetch(`/api/investments/${id}`, { method: 'DELETE' });
+        loadInvestments();
+    };
+
+    window.editGoal = function(goalStr) {
+        const goal = JSON.parse(decodeURIComponent(goalStr));
+        document.getElementById('goal-id').value = goal._id;
+        document.getElementById('goal-title').value = goal.title;
+        document.getElementById('goal-target').value = goal.target_amount;
+        document.getElementById('goal-current').value = goal.current_amount;
+        document.getElementById('goal-deadline').value = goal.deadline;
+        document.getElementById('goal-modal-title').textContent = 'Editar Meta';
+        document.getElementById('goal-modal').style.display = 'flex';
+    };
+
+    window.deleteGoal = async function(id) {
+        if(!confirm('Excluir esta meta?')) return;
+        await fetch(`/api/goals/${id}`, { method: 'DELETE' });
+        loadGoals();
+    };
 
     // --- Data Logic (Dashboard) ---
 

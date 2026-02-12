@@ -246,6 +246,13 @@ input:focus, select:focus {
     opacity: 0.9;
 }
 
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    width: auto;
+    margin: 0;
+}
+
 .btn-danger {
     background-color: var(--danger-color);
 }
@@ -319,11 +326,19 @@ input:focus, select:focus {
 }
 
 /* Tables */
-.history-section {
+.history-section, .investments-section, .goals-section {
     background: var(--card-bg);
     padding: 2rem;
     border-radius: 12px;
     border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
 }
 
 .table-container {
@@ -506,6 +521,61 @@ tr:last-child td {
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     margin-bottom: 2rem;
+}
+
+/* Goals Grid */
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.goal-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.goal-header h3 {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.goal-progress-bar {
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--success-color);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.goal-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.goal-deadline {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
 }
 
 /* Modal */

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investimentos & Metas - FinScope</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Fin<span>Scope</span></h1>
+            </div>
+            <div class="user-controls">
+                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <span class="divider">|</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <!-- Carteira de Investimentos -->
+            <section class="investments-section">
+                <div class="section-header">
+                    <h2>Minha Carteira</h2>
+                    <button class="btn-primary btn-small" onclick="openModal('investment-modal')">+ Novo Ativo</button>
+                </div>
+                
+                <div class="dashboard-summary">
+                    <div class="card">
+                        <h3>Patrimônio Total</h3>
+                        <p id="total-invested">R$ 0,00</p>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="investments-table">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Tipo</th>
+                                <th>Saldo Atual</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS populates -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Metas Financeiras -->
+            <section class="goals-section">
+                <div class="section-header">
+                    <h2>Metas Financeiras</h2>
+                    <button class="btn-primary btn-small" onclick="openModal('goal-modal')">+ Nova Meta</button>
+                </div>
+
+                <div class="goals-grid" id="goals-container">
+                    <!-- JS populates -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Investimento -->
+    <div id="investment-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="inv-modal-title">Novo Investimento</h2>
+                <span class="close-modal" onclick="closeModal('investment-modal')">&times;</span>
+            </div>
+            <form id="investment-form">
+                <input type="hidden" id="inv-id">
+                <div class="form-group">
+                    <label>Nome do Ativo</label>
+                    <input type="text" id="inv-name" required placeholder="Ex: Caixinha Nubank">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="inv-type">
+                        <option value="Renda Fixa">Renda Fixa</option>
+                        <option value="Renda Variável">Renda Variável</option>
+                        <option value="Poupança">Poupança</option>
+                        <option value="Cripto">Cripto</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Saldo Atual (R$)</label>
+                    <input type="number" id="inv-amount" step="0.01" required>
+                </div>
+                <button type="submit" class="btn-primary">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Meta -->
+    <div id="goal-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="goal-modal-title">Nova Meta</h2>
+                <span class="close-modal" onclick="closeModal('goal-modal')">&times;</span>
+            </div>
+            <form id="goal-form">
+                <input type="hidden" id="goal-id">
+                <div class="form-group">
+                    <label>Objetivo</label>
+                    <input type="text" id="goal-title" required placeholder="Ex: Viagem Japão">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor Alvo (R$)</label>
+                        <input type="number" id="goal-target" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Guardado (R$)</label>
+                        <input type="number" id="goal-current" step="0.01" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data Limite</label>
+                    <input type="date" id="goal-deadline" required>
+                </div>
+                <button type="submit" class="btn-primary">Salvar Meta</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Simple modal helpers for this page
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'investment-modal') {
+                document.getElementById('investment-form').reset();
+                document.getElementById('inv-id').value = '';
+                document.getElementById('inv-modal-title').textContent = 'Novo Investimento';
+            } else {
+                document.getElementById('goal-form').reset();
+                document.getElementById('goal-id').value = '';
+                document.getElementById('goal-modal-title').textContent = 'Nova Meta';
+            }
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
