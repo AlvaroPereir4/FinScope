@@ -119,6 +119,36 @@ def settings():
         return jsonify({"categories": ["Alimentação", "Moradia", "Transporte"], "buyers": ["Eu"]})
     return jsonify(serialize_doc(settings))
 
+# --- Helpers Dashboard ---
+
+@app.route('/api/years', methods=['GET'])
+@login_required
+def get_years():
+    pipeline = [
+        {"$match": {"user_id": ObjectId(current_user.id)}},
+        {"$project": {"year": {"$substr": ["$date", 0, 4]}}},
+        {"$group": {"_id": "$year"}}
+    ]
+    years_inc = list(db.incomes.aggregate(pipeline))
+    years_exp = list(db.expenses.aggregate(pipeline))
+    all_years = set()
+    for y in years_inc: all_years.add(y['_id'])
+    for y in years_exp: all_years.add(y['_id'])
+    current_year = str(datetime.now().year)
+    all_years.add(current_year)
+    return jsonify(sorted(list(all_years), reverse=True))
+
+@app.route('/api/balance', methods=['GET'])
+@login_required
+def get_total_balance():
+    pipeline_inc = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
+    pipeline_exp = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
+    res_inc = list(db.incomes.aggregate(pipeline_inc))
+    res_exp = list(db.expenses.aggregate(pipeline_exp))
+    total_inc = res_inc[0]['total'] if res_inc else 0
+    total_exp = res_exp[0]['total'] if res_exp else 0
+    return jsonify({"balance": total_inc - total_exp})
+
 # --- Cartões ---
 @app.route('/api/cards', methods=['GET', 'POST'])
 @login_required
@@ -192,7 +222,16 @@ def incomes():
         res = db.incomes.insert_one(new_income)
         new_income['_id'] = res.inserted_id
         return jsonify([serialize_doc(new_income)])
-    incomes = list(db.incomes.find({"user_id": ObjectId(current_user.id)}).sort("date", -1))
+    
+    query = {"user_id": ObjectId(current_user.id)}
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date or end_date:
+        query["date"] = {}
+        if start_date: query["date"]["$gte"] = start_date
+        if end_date: query["date"]["$lte"] = end_date
+
+    incomes = list(db.incomes.find(query).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
 @app.route('/api/expenses', methods=['GET', 'POST'])
@@ -223,24 +262,79 @@ def expenses(expense_id=None):
 
     if request.method == 'POST':
         data = request.json
-        card_id = data.get('card_id')
-        new_expense = {
-            "user_id": ObjectId(current_user.id),
-            "description": data['description'],
-            "amount": float(data['amount']),
-            "category": data.get('category', 'Geral'),
-            "date": data['date'],
-            "establishment": data.get('establishment'),
-            "buyer": data.get('buyer'),
-            "payment_method": data.get('payment_method'),
-            "card_id": ObjectId(card_id) if card_id else None,
-            "installments": data.get('installments'),
-            "observation": data.get('observation'),
-            "created_at": datetime.utcnow()
-        }
-        res = db.expenses.insert_one(new_expense)
-        new_expense['_id'] = res.inserted_id
-        return jsonify([serialize_doc(new_expense)])
+        
+        # Lógica de Parcelamento Automático
+        installments_str = data.get('installments')
+        base_date = datetime.strptime(data['date'], '%Y-%m-%d')
+        
+        # Verifica se é parcelado (ex: "1/6")
+        match = re.match(r'(\d+)/(\d+)', str(installments_str))
+        
+        if match:
+            current_inst = int(match.group(1))
+            total_inst = int(match.group(2))
+            
+            # Loop para criar/verificar todas as parcelas
+            for i in range(1, total_inst + 1):
+                # Calcula a data da parcela i
+                # Se a parcela atual é 3, a parcela 1 foi há 2 meses atrás
+                month_offset = i - current_inst
+                inst_date = base_date + relativedelta(months=month_offset)
+                inst_date_str = inst_date.strftime('%Y-%m-%d')
+                
+                inst_label = f"{i}/{total_inst}"
+                
+                # Verifica duplicidade
+                exists = db.expenses.find_one({
+                    "user_id": ObjectId(current_user.id),
+                    "description": data['description'],
+                    "amount": float(data['amount']),
+                    "installments": inst_label
+                    # Não checa data exata pois pode variar o dia, mas checa parcela e valor
+                })
+                
+                if not exists:
+                    obs = data.get('observation', '')
+                    if i != current_inst:
+                        obs = f"[Gerado Auto] {obs}".strip()
+                    
+                    new_expense = {
+                        "user_id": ObjectId(current_user.id),
+                        "description": data['description'],
+                        "amount": float(data['amount']),
+                        "category": data.get('category', 'Geral'),
+                        "date": inst_date_str,
+                        "establishment": data.get('establishment'),
+                        "buyer": data.get('buyer'),
+                        "payment_method": data.get('payment_method'),
+                        "card_id": ObjectId(data.get('card_id')) if data.get('card_id') else None,
+                        "installments": inst_label,
+                        "observation": obs,
+                        "created_at": datetime.utcnow()
+                    }
+                    db.expenses.insert_one(new_expense)
+            
+            return jsonify({"status": "success", "message": "Parcelas geradas"})
+        
+        else:
+            # Gasto normal (não parcelado)
+            new_expense = {
+                "user_id": ObjectId(current_user.id),
+                "description": data['description'],
+                "amount": float(data['amount']),
+                "category": data.get('category', 'Geral'),
+                "date": data['date'],
+                "establishment": data.get('establishment'),
+                "buyer": data.get('buyer'),
+                "payment_method": data.get('payment_method'),
+                "card_id": ObjectId(data.get('card_id')) if data.get('card_id') else None,
+                "installments": data.get('installments'),
+                "observation": data.get('observation'),
+                "created_at": datetime.utcnow()
+            }
+            res = db.expenses.insert_one(new_expense)
+            new_expense['_id'] = res.inserted_id
+            return jsonify([serialize_doc(new_expense)])
             
     query = {"user_id": ObjectId(current_user.id)}
     search_term = request.args.get('search')
@@ -263,7 +357,6 @@ def expenses(expense_id=None):
     return jsonify([serialize_doc(e) for e in expenses])
 
 # --- INVESTIMENTOS ---
-
 @app.route('/api/investments', methods=['GET', 'POST'])
 @app.route('/api/investments/<inv_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -304,11 +397,9 @@ def investments(inv_id=None):
     invs = list(db.investments.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(i) for i in invs])
 
-# Histórico Global de Investimentos (Para o Gráfico)
 @app.route('/api/investments/history', methods=['GET'])
 @login_required
 def investments_history():
-    # Retorna todas as entradas de investimento do usuário
     entries = list(db.investment_entries.find({"user_id": ObjectId(current_user.id)}).sort("date", 1))
     return jsonify([serialize_doc(e) for e in entries])
 
@@ -319,7 +410,6 @@ def investment_entries(inv_id):
         data = request.json
         amount = float(data['amount'])
         entry_type = data['type'] 
-        
         new_entry = {
             "user_id": ObjectId(current_user.id),
             "investment_id": ObjectId(inv_id),
@@ -329,22 +419,12 @@ def investment_entries(inv_id):
             "created_at": datetime.utcnow()
         }
         db.investment_entries.insert_one(new_entry)
-        
         inv = db.investments.find_one({"_id": ObjectId(inv_id)})
         current_val = float(inv.get('current_amount', 0))
-        
-        # Lógica de Saldo: Aporte (+) Rendimento (+) Saque (-)
-        if entry_type == 'withdrawal':
-            new_val = current_val - amount
-        else:
-            new_val = current_val + amount
-        
-        db.investments.update_one(
-            {"_id": ObjectId(inv_id)},
-            {"$set": {"current_amount": new_val, "updated_at": datetime.utcnow()}}
-        )
+        if entry_type == 'withdrawal': new_val = current_val - amount
+        else: new_val = current_val + amount
+        db.investments.update_one({"_id": ObjectId(inv_id)}, {"$set": {"current_amount": new_val, "updated_at": datetime.utcnow()}})
         return jsonify({"status": "success", "new_balance": new_val})
-
     entries = list(db.investment_entries.find({"investment_id": ObjectId(inv_id)}).sort("date", -1))
     return jsonify([serialize_doc(e) for e in entries])
 

@@ -27,6 +27,20 @@
         </header>
 
         <main>
+            <!-- Filtros do Dashboard -->
+            <div class="dashboard-controls">
+                <div class="filter-group">
+                    <button class="filter-btn active" data-period="30">30 Dias</button>
+                    <button class="filter-btn" data-period="180">6 Meses</button>
+                    <button class="filter-btn" data-period="year">Ano</button>
+                </div>
+                <div class="year-selector">
+                    <select id="dashboard-year">
+                        <!-- JS populates -->
+                    </select>
+                </div>
+            </div>
+
             <!-- Linha 1: Fluxo de Caixa -->
             <section class="dashboard-summary">
                 <div class="card income">
@@ -57,137 +71,171 @@
 
             <section class="charts-container">
                 <div class="chart-card">
-                    <canvas id="financeChart"></canvas>
+                    <div class="chart-header">
+                        <h3>Evolução Financeira</h3>
+                        <div class="chart-controls-wrapper">
+                            <div id="zoom-container" style="display: none;">
+                                <span id="zoom-label">30 Dias</span>
+                                <input type="range" id="chart-zoom" min="5" max="30" step="5" value="30">
+                            </div>
+                            <div class="chart-controls">
+                                <button class="chart-btn" data-granularity="day" title="Diário">Diário</button>
+                                <button class="chart-btn active" data-granularity="month" title="Mensal">Mensal</button>
+                                <button class="chart-btn" data-granularity="year" title="Anual">Anual</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="financeChart"></canvas>
+                    </div>
                 </div>
             </section>
 
             <div class="actions-grid">
-                <!-- Renda -->
-                <section class="input-section">
-                    <h2>Nova Renda</h2>
-                    <form id="income-form">
-                        <div class="form-group">
-                            <label>Descrição</label>
-                            <input type="text" id="inc-desc" required placeholder="Ex: Salário">
-                        </div>
-                        <div class="form-group">
-                            <label>Valor (R$)</label>
-                            <input type="number" id="inc-amount" step="0.01" required placeholder="0.00">
-                        </div>
-                        <div class="form-group">
-                            <label>Data</label>
-                            <input type="date" id="inc-date" required>
-                        </div>
-                        <button type="submit" class="btn-primary">Adicionar Renda</button>
-                    </form>
-                </section>
-
-                <!-- Gasto Completo -->
-                <section class="input-section">
-                    <h2>Novo Gasto</h2>
-                    <form id="expense-form">
-                        <input type="hidden" id="exp-id"> <!-- Hidden ID for Edit -->
-                        
-                        <div class="form-group">
-                            <label>Descrição</label>
-                            <input type="text" id="exp-desc" required placeholder="Ex: Almoço">
-                        </div>
-                        
-                        <div class="form-row">
+                <!-- Renda (Colapsável) -->
+                <section class="input-section collapsible collapsed">
+                    <div class="section-header">
+                        <h2>Nova Renda</h2>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <form id="income-form">
+                            <div class="form-group">
+                                <label>Descrição</label>
+                                <input type="text" id="inc-desc" required placeholder="Ex: Salário">
+                            </div>
                             <div class="form-group">
                                 <label>Valor (R$)</label>
-                                <input type="number" id="exp-amount" step="0.01" required placeholder="0.00">
+                                <input type="number" id="inc-amount" step="0.01" required placeholder="0.00">
                             </div>
                             <div class="form-group">
                                 <label>Data</label>
-                                <input type="date" id="exp-date" required>
+                                <input type="date" id="inc-date" required>
                             </div>
-                        </div>
+                            <button type="submit" class="btn-primary">Adicionar Renda</button>
+                        </form>
+                    </div>
+                </section>
 
-                        <div class="form-row">
+                <!-- Gasto Completo (Colapsável) -->
+                <section class="input-section collapsible collapsed">
+                    <div class="section-header">
+                        <h2>Novo Gasto</h2>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <form id="expense-form">
+                            <input type="hidden" id="exp-id">
+                            
                             <div class="form-group">
-                                <label>Estabelecimento</label>
-                                <input type="text" id="exp-establishment" placeholder="Ex: Restaurante X">
+                                <label>Descrição</label>
+                                <input type="text" id="exp-desc" required placeholder="Ex: Almoço">
                             </div>
-                            <div class="form-group">
-                                <label>Comprador</label>
-                                <select id="exp-buyer">
-                                    <!-- JS populates -->
-                                </select>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Valor (R$)</label>
+                                    <input type="number" id="exp-amount" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label>Data</label>
+                                    <input type="date" id="exp-date" required>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Categoria</label>
-                                <select id="exp-category">
-                                    <!-- JS populates -->
-                                </select>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Estabelecimento</label>
+                                    <input type="text" id="exp-establishment" placeholder="Ex: Restaurante X">
+                                </div>
+                                <div class="form-group">
+                                    <label>Comprador</label>
+                                    <select id="exp-buyer">
+                                        <!-- JS populates -->
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Método</label>
-                                <select id="exp-method" onchange="toggleCardSelect()">
-                                    <option value="debito">Débito</option>
-                                    <option value="credito">Crédito</option>
-                                    <option value="pix">PIX</option>
-                                    <option value="dinheiro">Dinheiro</option>
-                                </select>
-                            </div>
-                        </div>
 
-                        <div class="form-row" id="card-select-group" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Categoria</label>
+                                    <select id="exp-category">
+                                        <!-- JS populates -->
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Método</label>
+                                    <select id="exp-method" onchange="toggleCardSelect()">
+                                        <option value="debito">Débito</option>
+                                        <option value="credito">Crédito</option>
+                                        <option value="pix">PIX</option>
+                                        <option value="dinheiro">Dinheiro</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row" id="card-select-group" style="display: none;">
+                                <div class="form-group">
+                                    <label>Cartão</label>
+                                    <select id="exp-card">
+                                        <!-- JS populates -->
+                                    </select>
+                                </div>
+                                <div class="form-group" id="installments-group">
+                                    <label>Parcelas</label>
+                                    <input type="text" id="exp-installments" placeholder="Ex: 1/10">
+                                </div>
+                            </div>
+
                             <div class="form-group">
-                                <label>Cartão</label>
-                                <select id="exp-card">
-                                    <option value="">Selecione...</option>
-                                    <!-- JS populates -->
-                                </select>
+                                <label>Observação</label>
+                                <input type="text" id="exp-obs" placeholder="Detalhes opcionais">
                             </div>
-                            <div class="form-group" id="installments-group">
-                                <label>Parcelas</label>
-                                <input type="text" id="exp-installments" placeholder="Ex: 1/10">
+
+                            <div class="form-actions">
+                                <button type="submit" id="btn-save-expense" class="btn-primary btn-danger">Adicionar Gasto</button>
+                                <button type="button" id="btn-cancel-edit" class="btn-secondary" style="display: none;">Cancelar Edição</button>
                             </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Observação</label>
-                            <input type="text" id="exp-obs" placeholder="Detalhes opcionais">
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" id="btn-save-expense" class="btn-primary btn-danger">Adicionar Gasto</button>
-                            <button type="button" id="btn-cancel-edit" class="btn-secondary" style="display: none;">Cancelar Edição</button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </section>
             </div>
 
-            <!-- Seção de Busca e Relatórios -->
-            <section class="history-section">
+            <!-- Seção de Busca e Relatórios (Colapsável) -->
+            <section class="history-section collapsible collapsed">
                 <div class="section-header">
                     <h2>Relatórios e Busca</h2>
+                    <span class="toggle-icon">▼</span>
                 </div>
                 
-                <div class="search-bar">
-                    <div class="search-inputs">
-                        <input type="text" id="search-term" placeholder="Buscar por nome, local, comprador...">
-                        <input type="date" id="search-start">
-                        <input type="date" id="search-end">
-                        <button id="btn-search" class="btn-primary" style="width: auto; margin: 0;">Filtrar</button>
-                        <button id="btn-clear" class="btn-secondary">Limpar</button>
-                    </div>
-                    <div class="search-stats">
-                        <div class="stat-item">
-                            <span>Total Encontrado:</span>
-                            <strong id="search-total-amount">R$ 0,00</strong>
+                <div class="section-content">
+                    <div class="search-bar">
+                        <div class="search-inputs">
+                            <input type="text" id="search-term" placeholder="Buscar por nome, local, comprador...">
+                            <input type="date" id="search-start">
+                            <input type="date" id="search-end">
+                            <button id="btn-search" class="btn-primary" style="width: auto; margin: 0;">Filtrar</button>
+                            <button id="btn-clear" class="btn-secondary">Limpar</button>
                         </div>
-                        <div class="stat-item">
-                            <span>Itens:</span>
-                            <strong id="search-count">0</strong>
+                        <div class="search-stats">
+                            <div class="stat-item">
+                                <span>Total Encontrado:</span>
+                                <strong id="search-total-amount">R$ 0,00</strong>
+                            </div>
+                            <div class="stat-item">
+                                <span>Itens:</span>
+                                <strong id="search-count">0</strong>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </section>
 
+            <!-- Tabela de Histórico (Sempre visível) -->
+            <section class="history-section">
+                <div class="section-header">
+                    <h2>Histórico Recente</h2>
+                </div>
                 <div class="table-container">
                     <table id="history-table">
                         <thead>

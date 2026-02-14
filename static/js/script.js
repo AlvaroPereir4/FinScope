@@ -11,6 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
     const btnSaveExpense = document.getElementById('btn-save-expense');
     
+    // Dashboard Filters
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    const yearSelect = document.getElementById('dashboard-year');
+    
+    // Chart Controls
+    const chartBtns = document.querySelectorAll('.chart-btn');
+    const zoomContainer = document.getElementById('zoom-container');
+    const chartZoom = document.getElementById('chart-zoom');
+    const zoomLabel = document.getElementById('zoom-label');
+    
     // Search
     const btnSearch = document.getElementById('btn-search');
     const btnClear = document.getElementById('btn-clear');
@@ -45,11 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
 
+    // Collapsible Sections
+    const collapsibles = document.querySelectorAll('.collapsible .section-header');
+
     // State
     let currentCategories = [];
     let currentBuyers = [];
     let isEditing = false;
     let editingId = null;
+    let currentFilter = '30'; // Default 30 days
+    let selectedYear = new Date().getFullYear().toString();
+    let chartGranularity = 'month'; // day, month, year
+    let chartDays = 30; // Default zoom for day view
+    
+    // Data Cache for Chart
+    let cachedIncomes = [];
+    let cachedExpenses = [];
+    let cachedInvestments = [];
     
     // Default dates
     const today = new Date().toISOString().split('T')[0];
@@ -61,9 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initial Load ---
     if(document.getElementById('financeChart')) {
-        loadData();
-        loadCards();
+        loadYears();
         loadSettings();
+        loadCards();
+        // loadData called after years loaded
     }
     
     if(document.getElementById('cards-container')) {
@@ -79,6 +102,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
+    
+    // Collapsible Logic
+    collapsibles.forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.parentElement;
+            section.classList.toggle('collapsed');
+        });
+    });
+
     if(incomeForm) incomeForm.addEventListener('submit', (e) => handleFormSubmit(e, 'income'));
     if(expenseForm) expenseForm.addEventListener('submit', (e) => handleFormSubmit(e, 'expense'));
     
@@ -87,6 +119,54 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(btnSearch) btnSearch.addEventListener('click', () => loadData(true));
     if(btnClear) btnClear.addEventListener('click', clearSearch);
+
+    // Dashboard Filter Events
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = btn.dataset.period;
+            loadData();
+        });
+    });
+
+    if(yearSelect) {
+        yearSelect.addEventListener('change', () => {
+            selectedYear = yearSelect.value;
+            if(currentFilter !== 'year') {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                document.querySelector('[data-period="year"]').classList.add('active');
+                currentFilter = 'year';
+            }
+            loadData();
+        });
+    }
+    
+    // Chart Granularity Events
+    chartBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            chartBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            chartGranularity = btn.dataset.granularity;
+            
+            // Show/Hide Zoom Slider
+            if(chartGranularity === 'day') {
+                zoomContainer.style.display = 'flex';
+            } else {
+                zoomContainer.style.display = 'none';
+            }
+            
+            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+        });
+    });
+
+    if(chartZoom) {
+        chartZoom.addEventListener('input', () => {
+            chartDays = parseInt(chartZoom.value);
+            zoomLabel.textContent = `${chartDays} Dias`;
+            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+        });
+    }
 
     // Settings Events
     if(btnSettings) {
@@ -412,6 +492,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Data Logic (Dashboard) ---
 
+    async function loadYears() {
+        try {
+            const res = await fetch('/api/years');
+            const years = await res.json();
+            yearSelect.innerHTML = '';
+            years.forEach(year => {
+                const opt = document.createElement('option');
+                opt.value = year;
+                opt.textContent = year;
+                if(year === selectedYear) opt.selected = true;
+                yearSelect.appendChild(opt);
+            });
+            loadData(); // Load data after years are set
+        } catch(err) { console.error(err); }
+    }
+
     async function loadCards() {
         try {
             const res = await fetch('/api/cards');
@@ -519,6 +615,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Scroll to form
         expenseForm.scrollIntoView({ behavior: 'smooth' });
+        
+        // Open the collapsible if closed
+        const section = expenseForm.closest('.input-section');
+        if(section.classList.contains('collapsed')) {
+            section.classList.remove('collapsed');
+        }
     };
 
     window.deleteExpense = async function(id) {
@@ -629,22 +731,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(searchStart.value) params.append('start_date', searchStart.value);
                 if(searchEnd.value) params.append('end_date', searchEnd.value);
                 expenseUrl += `?${params.toString()}`;
+            } else {
+                // Apply dashboard filters
+                let startDate = '';
+                let endDate = '';
+                const now = new Date();
+                
+                if (currentFilter === '30') {
+                    const past = new Date();
+                    past.setDate(now.getDate() - 30);
+                    startDate = past.toISOString().split('T')[0];
+                    endDate = now.toISOString().split('T')[0];
+                } else if (currentFilter === '180') {
+                    const past = new Date();
+                    past.setMonth(now.getMonth() - 6);
+                    startDate = past.toISOString().split('T')[0];
+                    endDate = now.toISOString().split('T')[0];
+                } else if (currentFilter === 'year') {
+                    startDate = `${selectedYear}-01-01`;
+                    endDate = `${selectedYear}-12-31`;
+                }
+                expenseUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
 
-            const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes] = await Promise.all([
+            const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch('/api/incomes'), 
                 fetch(expenseUrl),
                 fetch('/api/investments/history'),
-                fetch('/api/investments') // Get current balances for Net Worth
+                fetch('/api/investments'),
+                fetch('/api/balance')
             ]);
 
             const incomes = await incomesRes.json();
             const expenses = await expensesRes.json();
             const investmentsHistory = await investmentsRes.json();
             const currentInvestments = await allInvestmentsRes.json();
+            const balanceData = await balanceRes.json();
+            
+            // Cache data for chart granularity switching
+            cachedIncomes = incomes;
+            cachedExpenses = expenses;
+            cachedInvestments = investmentsHistory;
 
             if (!isSearch) {
-                updateDashboard(incomes, expenses, currentInvestments);
+                updateDashboard(incomes, expenses, currentInvestments, balanceData);
                 updateChart(incomes, expenses, investmentsHistory);
             }
             
@@ -667,8 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchCount.textContent = expenses.length;
     }
 
-    function updateDashboard(incomes, expenses, currentInvestments) {
-        // 1. Fluxo de Caixa
+    function updateDashboard(incomes, expenses, currentInvestments, balanceData) {
         const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
         const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
         const balance = totalIncome - totalExpense;
@@ -680,9 +809,8 @@ document.addEventListener('DOMContentLoaded', () => {
         balanceEl.textContent = formatCurrency(balance);
         balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
 
-        // 2. Patrimônio
         const totalInvested = currentInvestments.reduce((sum, inv) => sum + inv.current_amount, 0);
-        const netWorth = balance + totalInvested;
+        const netWorth = balanceData.balance + totalInvested;
 
         document.getElementById('total-invested-dash').textContent = formatCurrency(totalInvested);
         document.getElementById('net-worth').textContent = formatCurrency(netWorth);
@@ -750,57 +878,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateChart(incomes, expenses, investments) {
         const ctx = document.getElementById('financeChart').getContext('2d');
-        const monthlyData = {};
+        const dataMap = {};
         
-        // Process Incomes & Expenses
+        // Helper to get key based on granularity
+        const getKey = (dateStr) => {
+            if (chartGranularity === 'day') return dateStr; // YYYY-MM-DD
+            if (chartGranularity === 'year') return dateStr.substring(0, 4); // YYYY
+            return dateStr.substring(0, 7); // YYYY-MM (default)
+        };
+
+        // Process Data
         [...incomes, ...expenses].forEach(item => {
-            const monthKey = item.date.substring(0, 7);
-            if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0, investment: 0 };
-            if (incomes.includes(item)) monthlyData[monthKey].income += item.amount;
-            else monthlyData[monthKey].expense += item.amount;
+            const key = getKey(item.date);
+            if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
+            if (incomes.includes(item)) dataMap[key].income += item.amount;
+            else dataMap[key].expense += item.amount;
         });
 
-        // Process Investments (Only contributions count as "spending" for chart visualization)
         investments.forEach(inv => {
             if(inv.type === 'contribution') {
-                const monthKey = inv.date.substring(0, 7);
-                if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0, investment: 0 };
-                monthlyData[monthKey].investment += inv.amount;
+                const key = getKey(inv.date);
+                if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
+                dataMap[key].investment += inv.amount;
             }
         });
 
-        const sortedMonths = Object.keys(monthlyData).sort();
+        let sortedKeys = Object.keys(dataMap).sort();
         
+        // Apply Zoom Logic for Day View
+        if (chartGranularity === 'day') {
+            // Slice the last X days based on slider
+            sortedKeys = sortedKeys.slice(-chartDays);
+        }
+        
+        // Format Labels
+        const labels = sortedKeys.map(k => {
+            if (chartGranularity === 'day') {
+                const [y, m, d] = k.split('-');
+                return `${d}/${m}`;
+            }
+            if (chartGranularity === 'year') return k;
+            const [y, m] = k.split('-');
+            return `${m}/${y}`;
+        });
+
         if (financeChart) financeChart.destroy();
         
         financeChart = new Chart(ctx, {
-            type: 'bar',
+            type: 'line', 
             data: {
-                labels: sortedMonths.map(m => { const [y, mo] = m.split('-'); return `${mo}/${y}`; }),
+                labels: labels,
                 datasets: [
                     { 
                         label: 'Rendas', 
-                        data: sortedMonths.map(m => monthlyData[m].income), 
-                        backgroundColor: '#2ecc71', 
-                        borderRadius: 4 
+                        data: sortedKeys.map(k => dataMap[k].income), 
+                        borderColor: '#2ecc71', 
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.4, 
+                        fill: true
                     },
                     { 
                         label: 'Gastos', 
-                        data: sortedMonths.map(m => monthlyData[m].expense), 
-                        backgroundColor: '#e74c3c', 
-                        borderRadius: 4 
+                        data: sortedKeys.map(k => dataMap[k].expense), 
+                        borderColor: '#e74c3c', 
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4,
+                        fill: true
                     },
                     { 
                         label: 'Investido', 
-                        data: sortedMonths.map(m => monthlyData[m].investment), 
-                        backgroundColor: '#3498db', 
-                        borderRadius: 4 
+                        data: sortedKeys.map(k => dataMap[k].investment), 
+                        borderColor: '#3498db', 
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
                     }
                 ]
             },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#e6e1de' } } },
+                responsive: true, 
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: { 
+                    legend: { labels: { color: '#e6e1de' } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
                 scales: {
                     y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
                     x: { grid: { display: false }, ticks: { color: '#8f8681' } }

@@ -101,6 +101,52 @@ header {
     transform: rotate(45deg);
 }
 
+/* Dashboard Controls */
+.dashboard-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.filter-group {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--card-bg);
+    padding: 0.3rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.filter-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    color: var(--text-primary);
+}
+
+.filter-btn.active {
+    background-color: var(--accent-color);
+    color: #fff;
+}
+
+.year-selector select {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
 /* Dashboard Grid */
 .dashboard-summary {
     display: grid;
@@ -145,7 +191,98 @@ header {
     padding: 1.5rem;
     border-radius: 12px;
     border: 1px solid var(--border-color);
-    height: 400px;
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.chart-header h3 {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.chart-controls-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+#zoom-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: rgba(255,255,255,0.05);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+}
+
+#zoom-label {
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    font-weight: 600;
+    min-width: 50px;
+}
+
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    outline: none;
+    padding: 0;
+    border: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    transition: background .15s ease-in-out;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+    background: var(--accent-hover);
+}
+
+.chart-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chart-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.chart-btn:hover, .chart-btn.active {
+    background: var(--accent-color);
+    color: #fff;
+    border-color: var(--accent-color);
+}
+
+.chart-wrapper {
+    flex: 1;
+    position: relative;
 }
 
 /* Forms & Inputs */
@@ -162,6 +299,40 @@ header {
     }
 }
 
+/* Collapsible Sections */
+.collapsible .section-header {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.collapsible .section-content {
+    display: block;
+    margin-top: 1.5rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.collapsible.collapsed .section-content {
+    display: none;
+}
+
+.collapsible .toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+    color: var(--accent-color);
+}
+
+.collapsible:not(.collapsed) .toggle-icon {
+    transform: rotate(180deg);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .input-section {
     background: var(--card-bg);
     padding: 2rem;
@@ -170,26 +341,16 @@ header {
     transition: all 0.3s ease;
 }
 
-.input-section.collapsed .section-header {
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.input-section.collapsed h2 {
-    margin-bottom: 0;
-}
-
-.toggle-icon {
-    font-size: 1.5rem;
-    color: var(--accent-color);
-}
-
 h2 {
     font-size: 1.2rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0; /* Reset margin for header alignment */
     color: var(--text-primary);
+}
+
+/* Add margin back for non-collapsible headers or when expanded content follows */
+.input-section:not(.collapsible) h2,
+.section-content h2 {
+    margin-bottom: 1.5rem;
 }
 
 .form-group {
@@ -342,6 +503,11 @@ input:focus, select:focus {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
+}
+
+/* Adjust margin for collapsed headers */
+.collapsible.collapsed .section-header {
+    margin-bottom: 0;
 }
 
 .table-container {
