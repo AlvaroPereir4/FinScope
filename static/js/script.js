@@ -1,8 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- Elements ---
     const incomeForm = document.getElementById('income-form');
-    const expenseForm = document.getElementById('expense-form');
+    const expenseForm = document.getElementById('expense-form'); // Micro Form
+    const consolidatedForm = document.getElementById('consolidated-form'); // Macro Form
     const historyTableBody = document.querySelector('#history-table tbody');
+    
+    // Micro Form Elements
     const cardSelect = document.getElementById('exp-card');
     const methodSelect = document.getElementById('exp-method');
     const cardGroup = document.getElementById('card-select-group');
@@ -11,24 +14,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
     const btnSaveExpense = document.getElementById('btn-save-expense');
     
+    // Macro Form Elements
+    const consCategorySelect = document.getElementById('cons-category');
+
     // Dashboard Filters
     const filterBtns = document.querySelectorAll('.filter-btn');
     const yearSelect = document.getElementById('dashboard-year');
     
-    // Chart Controls
+    // Chart Controls (Dashboard)
     const chartBtns = document.querySelectorAll('.chart-btn');
     const zoomContainer = document.getElementById('zoom-container');
     const chartZoom = document.getElementById('chart-zoom');
     const zoomLabel = document.getElementById('zoom-label');
     
-    // Search
-    const btnSearch = document.getElementById('btn-search');
-    const btnClear = document.getElementById('btn-clear');
+    // Chart Controls (Detailed)
+    const detChartBtns = document.querySelectorAll('.det-chart-btn');
+    const detZoomContainer = document.getElementById('det-zoom-container');
+    const detChartZoom = document.getElementById('det-chart-zoom');
+    const detZoomLabel = document.getElementById('det-zoom-label');
+    
+    // Search (Micro Page)
     const searchTerm = document.getElementById('search-term');
-    const searchStart = document.getElementById('search-start');
-    const searchEnd = document.getElementById('search-end');
-    const searchTotalAmount = document.getElementById('search-total-amount');
-    const searchCount = document.getElementById('search-count');
 
     // Settings Modal
     const btnSettings = document.getElementById('btn-settings');
@@ -63,30 +69,36 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBuyers = [];
     let isEditing = false;
     let editingId = null;
-    let currentFilter = '30'; // Default 30 days
+    let currentFilter = '30'; 
     let selectedYear = new Date().getFullYear().toString();
-    let chartGranularity = 'month'; // day, month, year
-    let chartDays = 30; // Default zoom for day view
     
-    // Data Cache for Chart
+    // Chart State
+    let chartGranularity = 'month'; 
+    let chartDays = 30;
+    let detChartGranularity = 'month';
+    let detChartDays = 30;
+    
+    // Data Cache
     let cachedIncomes = [];
     let cachedExpenses = [];
     let cachedInvestments = [];
+    let cachedDetailedExpenses = []; // For detailed page chart
     
     // Default dates
     const today = new Date().toISOString().split('T')[0];
     if(document.getElementById('inc-date')) document.getElementById('inc-date').value = today;
     if(document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
+    if(document.getElementById('cons-date')) document.getElementById('cons-date').value = today;
     if(invoiceMonthInput) invoiceMonthInput.value = today.substring(0, 7);
 
     let financeChart = null;
+    let detailedChart = null;
 
     // --- Initial Load ---
+    loadSettings(); 
+
     if(document.getElementById('financeChart')) {
         loadYears();
-        loadSettings();
-        loadCards();
-        // loadData called after years loaded
     }
     
     if(document.getElementById('cards-container')) {
@@ -100,10 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if(document.getElementById('goals-container')) {
         loadGoals();
     }
+    
+    if(window.location.pathname === '/detailed') {
+        loadCards(); 
+        loadDetailedData();
+    }
 
     // --- Event Listeners ---
     
-    // Collapsible Logic
     collapsibles.forEach(header => {
         header.addEventListener('click', () => {
             const section = header.parentElement;
@@ -113,12 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(incomeForm) incomeForm.addEventListener('submit', (e) => handleFormSubmit(e, 'income'));
     if(expenseForm) expenseForm.addEventListener('submit', (e) => handleFormSubmit(e, 'expense'));
+    if(consolidatedForm) consolidatedForm.addEventListener('submit', (e) => handleFormSubmit(e, 'consolidated'));
     
     if(methodSelect) methodSelect.addEventListener('change', toggleCardSelect);
     if(btnCancelEdit) btnCancelEdit.addEventListener('click', cancelEdit);
     
-    if(btnSearch) btnSearch.addEventListener('click', () => loadData(true));
-    if(btnClear) btnClear.addEventListener('click', clearSearch);
+    if(searchTerm) searchTerm.addEventListener('input', () => loadDetailedData(true));
 
     // Dashboard Filter Events
     filterBtns.forEach(btn => {
@@ -142,20 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Chart Granularity Events
+    // Dashboard Chart Controls
     chartBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             chartBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             chartGranularity = btn.dataset.granularity;
-            
-            // Show/Hide Zoom Slider
-            if(chartGranularity === 'day') {
-                zoomContainer.style.display = 'flex';
-            } else {
-                zoomContainer.style.display = 'none';
-            }
-            
+            if(chartGranularity === 'day') zoomContainer.style.display = 'flex';
+            else zoomContainer.style.display = 'none';
             updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
         });
     });
@@ -165,6 +175,26 @@ document.addEventListener('DOMContentLoaded', () => {
             chartDays = parseInt(chartZoom.value);
             zoomLabel.textContent = `${chartDays} Dias`;
             updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+        });
+    }
+    
+    // Detailed Chart Controls
+    detChartBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            detChartBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            detChartGranularity = btn.dataset.granularity;
+            if(detChartGranularity === 'day') detZoomContainer.style.display = 'flex';
+            else detZoomContainer.style.display = 'none';
+            updateDetailedChart(cachedDetailedExpenses);
+        });
+    });
+
+    if(detChartZoom) {
+        detChartZoom.addEventListener('input', () => {
+            detChartDays = parseInt(detChartZoom.value);
+            detZoomLabel.textContent = `${detChartDays} Dias`;
+            updateDetailedChart(cachedDetailedExpenses);
         });
     }
 
@@ -205,20 +235,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 current_amount: parseFloat(document.getElementById('inv-current').value),
                 target_amount: parseFloat(document.getElementById('inv-target').value || 0)
             };
-            
             const url = id ? `/api/investments/${id}` : '/api/investments';
             const method = id ? 'PUT' : 'POST';
-            
             try {
-                const res = await fetch(url, {
-                    method: method,
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                if(res.ok) {
-                    document.getElementById('investment-modal').style.display = 'none';
-                    loadInvestments();
-                }
+                const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if(res.ok) { document.getElementById('investment-modal').style.display = 'none'; loadInvestments(); }
             } catch(err) { console.error(err); }
         });
     }
@@ -232,17 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: parseFloat(document.getElementById('entry-amount').value),
                 date: document.getElementById('entry-date').value
             };
-            
             try {
-                const res = await fetch(`/api/investments/${invId}/entries`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                if(res.ok) {
-                    document.getElementById('entry-modal').style.display = 'none';
-                    loadInvestments(); // Refresh balances
-                }
+                const res = await fetch(`/api/investments/${invId}/entries`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if(res.ok) { document.getElementById('entry-modal').style.display = 'none'; loadInvestments(); }
             } catch(err) { console.error(err); }
         });
     }
@@ -258,20 +271,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 current_amount: parseFloat(document.getElementById('goal-current').value),
                 deadline: document.getElementById('goal-deadline').value
             };
-            
             const url = id ? `/api/goals/${id}` : '/api/goals';
             const method = id ? 'PUT' : 'POST';
-            
             try {
-                const res = await fetch(url, {
-                    method: method,
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                if(res.ok) {
-                    document.getElementById('goal-modal').style.display = 'none';
-                    loadGoals();
-                }
+                const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if(res.ok) { document.getElementById('goal-modal').style.display = 'none'; loadGoals(); }
             } catch(err) { console.error(err); }
         });
     }
@@ -354,15 +358,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateSelects() {
-        if(categorySelect) {
-            categorySelect.innerHTML = '';
-            currentCategories.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                categorySelect.appendChild(opt);
-            });
-        }
+        const selects = [categorySelect, consCategorySelect];
+        selects.forEach(sel => {
+            if(sel) {
+                sel.innerHTML = '';
+                currentCategories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    sel.appendChild(opt);
+                });
+            }
+        });
+
         if(buyerSelect) {
             buyerSelect.innerHTML = '';
             currentBuyers.forEach(buyer => {
@@ -389,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const invStr = encodeURIComponent(JSON.stringify(inv));
                 
                 const el = document.createElement('div');
-                el.className = 'credit-card-display'; // Reusing card style
+                el.className = 'credit-card-display'; 
                 el.style.cursor = 'pointer';
                 el.onclick = (e) => {
                     if(e.target.tagName !== 'BUTTON') openEntryModal(inv._id);
@@ -504,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(year === selectedYear) opt.selected = true;
                 yearSelect.appendChild(opt);
             });
-            loadData(); // Load data after years are set
+            loadData(); 
         } catch(err) { console.error(err); }
     }
 
@@ -542,8 +550,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: parseFloat(document.getElementById('inc-amount').value),
                 date: document.getElementById('inc-date').value
             };
+        } else if (type === 'consolidated') {
+            // Macro Expense
+            data = {
+                description: document.getElementById('cons-desc').value,
+                amount: parseFloat(document.getElementById('cons-amount').value),
+                date: document.getElementById('cons-date').value,
+                category: document.getElementById('cons-category').value,
+                is_consolidated: true,
+                payment_method: 'debito' // Default for consolidated
+            };
         } else {
-            // Expense Data
+            // Micro Expense
             data = {
                 description: document.getElementById('exp-desc').value,
                 amount: parseFloat(document.getElementById('exp-amount').value),
@@ -554,7 +572,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 payment_method: document.getElementById('exp-method').value,
                 card_id: document.getElementById('exp-card').value || null,
                 installments: document.getElementById('exp-installments').value,
-                observation: document.getElementById('exp-obs').value
+                observation: document.getElementById('exp-obs').value,
+                is_consolidated: false
             };
 
             if (isEditing) {
@@ -574,9 +593,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isEditing) cancelEdit();
                 else e.target.reset();
                 
-                document.getElementById(isIncome ? 'inc-date' : 'exp-date').value = today;
-                if (!isIncome) toggleCardSelect(); 
-                loadData(); 
+                if(type === 'income') document.getElementById('inc-date').value = today;
+                else if(type === 'consolidated') document.getElementById('cons-date').value = today;
+                else {
+                    document.getElementById('exp-date').value = today;
+                    toggleCardSelect();
+                }
+                
+                if(window.location.pathname === '/detailed') loadDetailedData();
+                else loadData(); 
             } else {
                 alert('Erro ao salvar dados');
             }
@@ -627,7 +652,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!confirm('Tem certeza que deseja excluir este gasto?')) return;
         try {
             const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-            if(res.ok) loadData();
+            if(res.ok) {
+                if(window.location.pathname === '/detailed') loadDetailedData();
+                else loadData();
+            }
         } catch(err) { console.error(err); }
     };
 
@@ -636,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editingId = null;
         expenseForm.reset();
         document.getElementById('exp-date').value = today;
-        btnSaveExpense.textContent = 'Adicionar Gasto';
+        btnSaveExpense.textContent = 'Registrar Gasto';
         btnCancelEdit.style.display = 'none';
         toggleCardSelect();
     }
@@ -724,38 +752,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadData(isSearch = false) {
         try {
-            let expenseUrl = '/api/expenses';
-            if (isSearch) {
-                const params = new URLSearchParams();
-                if(searchTerm.value) params.append('search', searchTerm.value);
-                if(searchStart.value) params.append('start_date', searchStart.value);
-                if(searchEnd.value) params.append('end_date', searchEnd.value);
-                expenseUrl += `?${params.toString()}`;
-            } else {
-                // Apply dashboard filters
-                let startDate = '';
-                let endDate = '';
-                const now = new Date();
-                
-                if (currentFilter === '30') {
-                    const past = new Date();
-                    past.setDate(now.getDate() - 30);
-                    startDate = past.toISOString().split('T')[0];
-                    endDate = now.toISOString().split('T')[0];
-                } else if (currentFilter === '180') {
-                    const past = new Date();
-                    past.setMonth(now.getMonth() - 6);
-                    startDate = past.toISOString().split('T')[0];
-                    endDate = now.toISOString().split('T')[0];
-                } else if (currentFilter === 'year') {
-                    startDate = `${selectedYear}-01-01`;
-                    endDate = `${selectedYear}-12-31`;
-                }
-                expenseUrl += `?start_date=${startDate}&end_date=${endDate}`;
+            // Dashboard loads Consolidated + Non-Credit Detailed
+            let expenseUrl = '/api/expenses?view_type=consolidated';
+            
+            // Apply dashboard filters
+            let startDate = '';
+            let endDate = '';
+            const now = new Date();
+            
+            if (currentFilter === '30') {
+                const past = new Date();
+                past.setDate(now.getDate() - 30);
+                startDate = past.toISOString().split('T')[0];
+                endDate = now.toISOString().split('T')[0];
+            } else if (currentFilter === '180') {
+                const past = new Date();
+                past.setMonth(now.getMonth() - 6);
+                startDate = past.toISOString().split('T')[0];
+                endDate = now.toISOString().split('T')[0];
+            } else if (currentFilter === 'year') {
+                startDate = `${selectedYear}-01-01`;
+                endDate = `${selectedYear}-12-31`;
             }
+            expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
+            
+            const incomeUrl = `/api/incomes?start_date=${startDate}&end_date=${endDate}`;
 
             const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
-                fetch('/api/incomes'), 
+                fetch(incomeUrl), 
                 fetch(expenseUrl),
                 fetch('/api/investments/history'),
                 fetch('/api/investments'),
@@ -768,33 +792,62 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentInvestments = await allInvestmentsRes.json();
             const balanceData = await balanceRes.json();
             
-            // Cache data for chart granularity switching
             cachedIncomes = incomes;
             cachedExpenses = expenses;
             cachedInvestments = investmentsHistory;
 
-            if (!isSearch) {
-                updateDashboard(incomes, expenses, currentInvestments, balanceData);
-                updateChart(incomes, expenses, investmentsHistory);
-            }
-            
-            updateTable(incomes, expenses, isSearch);
-            updateSearchStats(expenses, isSearch);
+            updateDashboard(incomes, expenses, currentInvestments, balanceData);
+            updateChart(incomes, expenses, investmentsHistory);
+            updateTable(incomes, expenses);
 
         } catch (error) {
             console.error('Error loading data:', error);
         }
     }
 
-    function updateSearchStats(expenses, isSearch) {
-        if (!isSearch) {
-            searchTotalAmount.textContent = '---';
-            searchCount.textContent = '---';
-            return;
-        }
-        const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-        searchTotalAmount.textContent = formatCurrency(total);
-        searchCount.textContent = expenses.length;
+    async function loadDetailedData(isSearch = false) {
+        try {
+            let url = '/api/expenses?view_type=detailed'; // Load everything for detailed view
+            if(isSearch && searchTerm.value) {
+                url += `&search=${searchTerm.value}`;
+            }
+            
+            const res = await fetch(url);
+            const expenses = await res.json();
+            
+            cachedDetailedExpenses = expenses;
+            updateDetailedChart(expenses);
+            
+            historyTableBody.innerHTML = '';
+            expenses.forEach(item => {
+                const row = document.createElement('tr');
+                
+                let details = '';
+                if (item.payment_method === 'credito' && item.card_name) {
+                    details = `<span class="badge card">💳 ${item.card_name}</span>`;
+                    if (item.installments) details += ` <span class="badge installments">${item.installments}x</span>`;
+                } else {
+                    details = `<span class="badge method">${item.payment_method || '-'}</span>`;
+                }
+                if(item.is_consolidated) details += ` <span class="badge" style="background:#e74c3c;color:#fff">Macro</span>`;
+
+                const itemStr = encodeURIComponent(JSON.stringify(item));
+                const actions = `
+                    <button class="btn-icon-small edit" onclick="editExpense('${itemStr}')">✎</button>
+                    <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}')">🗑</button>
+                `;
+
+                row.innerHTML = `
+                    <td>${formatDate(item.date)}</td>
+                    <td>${item.description}</td>
+                    <td>${item.buyer || '-'}</td>
+                    <td>${details}</td>
+                    <td class="amount-negative">- ${formatCurrency(item.amount)}</td>
+                    <td>${actions}</td>
+                `;
+                historyTableBody.appendChild(row);
+            });
+        } catch(err) { console.error(err); }
     }
 
     function updateDashboard(incomes, expenses, currentInvestments, balanceData) {
@@ -816,61 +869,35 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('net-worth').textContent = formatCurrency(netWorth);
     }
 
-    function updateTable(incomes, expenses, isSearch) {
+    function updateTable(incomes, expenses) {
         historyTableBody.innerHTML = '';
-        let allItems = [];
-        
-        if (isSearch) {
-            const term = searchTerm.value.toLowerCase();
-            const filteredIncomes = incomes.filter(i => i.description.toLowerCase().includes(term));
-            allItems = [
-                ...filteredIncomes.map(i => ({...i, type: 'income'})),
-                ...expenses.map(e => ({...e, type: 'expense'}))
-            ];
-        } else {
-            allItems = [
-                ...incomes.map(i => ({...i, type: 'income'})),
-                ...expenses.map(e => ({...e, type: 'expense'}))
-            ];
-        }
+        let allItems = [
+            ...incomes.map(i => ({...i, type: 'income'})),
+            ...expenses.map(e => ({...e, type: 'expense'}))
+        ];
 
         allItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        allItems.forEach(item => {
+        allItems.slice(0, 10).forEach(item => {
             const row = document.createElement('tr');
             const isIncome = item.type === 'income';
             
             let details = '';
             if (!isIncome) {
-                if (item.payment_method === 'credito' && item.card_name) {
-                    details = `<span class="badge card">💳 ${item.card_name}</span>`;
-                    if (item.installments) details += ` <span class="badge installments">${item.installments}x</span>`;
-                } else {
-                    details = `<span class="badge method">${item.payment_method || '-'}</span>`;
-                }
+                if(item.is_consolidated) details = `<span class="badge" style="background:#e74c3c;color:#fff">Conta</span>`;
+                else details = `<span class="badge method">${item.payment_method || '-'}</span>`;
             }
-
-            const itemStr = encodeURIComponent(JSON.stringify(item));
-            const actions = !isIncome ? `
-                <button class="btn-icon-small edit" onclick="editExpense('${itemStr}')">✎</button>
-                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}')">🗑</button>
-            ` : '';
 
             row.innerHTML = `
                 <td>${formatDate(item.date)}</td>
                 <td style="color: ${isIncome ? 'var(--success-color)' : 'var(--danger-color)'}">
-                    ${isIncome ? 'Renda' : 'Gasto'}
+                    ${isIncome ? 'Renda' : 'Saída'}
                 </td>
-                <td>
-                    <div class="desc-main">${item.description}</div>
-                    ${!isIncome && item.establishment ? `<div class="desc-sub">${item.establishment}</div>` : ''}
-                </td>
-                <td>${!isIncome && item.buyer ? item.buyer : '-'}</td>
-                <td>${details}</td>
+                <td>${item.description}</td>
                 <td class="${isIncome ? 'amount-positive' : 'amount-negative'}">
                     ${isIncome ? '+' : '-'} ${formatCurrency(item.amount)}
                 </td>
-                <td>${actions}</td>
+                <td>-</td>
             `;
             historyTableBody.appendChild(row);
         });
@@ -880,14 +907,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = document.getElementById('financeChart').getContext('2d');
         const dataMap = {};
         
-        // Helper to get key based on granularity
         const getKey = (dateStr) => {
-            if (chartGranularity === 'day') return dateStr; // YYYY-MM-DD
-            if (chartGranularity === 'year') return dateStr.substring(0, 4); // YYYY
-            return dateStr.substring(0, 7); // YYYY-MM (default)
+            if (chartGranularity === 'day') return dateStr; 
+            if (chartGranularity === 'year') return dateStr.substring(0, 4); 
+            return dateStr.substring(0, 7); 
         };
 
-        // Process Data
         [...incomes, ...expenses].forEach(item => {
             const key = getKey(item.date);
             if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
@@ -905,13 +930,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let sortedKeys = Object.keys(dataMap).sort();
         
-        // Apply Zoom Logic for Day View
         if (chartGranularity === 'day') {
-            // Slice the last X days based on slider
             sortedKeys = sortedKeys.slice(-chartDays);
         }
         
-        // Format Labels
         const labels = sortedKeys.map(k => {
             if (chartGranularity === 'day') {
                 const [y, m, d] = k.split('-');
@@ -938,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         fill: true
                     },
                     { 
-                        label: 'Gastos', 
+                        label: 'Saídas', 
                         data: sortedKeys.map(k => dataMap[k].expense), 
                         borderColor: '#e74c3c', 
                         backgroundColor: 'rgba(231, 76, 60, 0.1)',
@@ -950,6 +972,100 @@ document.addEventListener('DOMContentLoaded', () => {
                         data: sortedKeys.map(k => dataMap[k].investment), 
                         borderColor: '#3498db', 
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true, 
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: { 
+                    legend: { labels: { color: '#e6e1de' } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
+                    x: { grid: { display: false }, ticks: { color: '#8f8681' } }
+                }
+            }
+        });
+    }
+    
+    function updateDetailedChart(expenses) {
+        const ctx = document.getElementById('detailedChart').getContext('2d');
+        const dataMap = {};
+        
+        const getKey = (dateStr) => {
+            if (detChartGranularity === 'day') return dateStr; 
+            if (detChartGranularity === 'year') return dateStr.substring(0, 4); 
+            return dateStr.substring(0, 7); 
+        };
+
+        expenses.forEach(item => {
+            const key = getKey(item.date);
+            if (!dataMap[key]) dataMap[key] = { credit: 0, debit: 0 };
+            
+            if (item.payment_method === 'credito') {
+                dataMap[key].credit += item.amount;
+            } else {
+                dataMap[key].debit += item.amount;
+            }
+        });
+
+        let sortedKeys = Object.keys(dataMap).sort();
+        
+        if (detChartGranularity === 'day') {
+            sortedKeys = sortedKeys.slice(-detChartDays);
+        }
+        
+        const labels = sortedKeys.map(k => {
+            if (detChartGranularity === 'day') {
+                const [y, m, d] = k.split('-');
+                return `${d}/${m}`;
+            }
+            if (detChartGranularity === 'year') return k;
+            const [y, m] = k.split('-');
+            return `${m}/${y}`;
+        });
+
+        if (detailedChart) detailedChart.destroy();
+        
+        detailedChart = new Chart(ctx, {
+            type: 'line', 
+            data: {
+                labels: labels,
+                datasets: [
+                    { 
+                        label: 'Crédito', 
+                        data: sortedKeys.map(k => dataMap[k].credit), 
+                        borderColor: '#9b59b6', 
+                        backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                        tension: 0.4, 
+                        fill: true
+                    },
+                    { 
+                        label: 'Débito/Outros', 
+                        data: sortedKeys.map(k => dataMap[k].debit), 
+                        borderColor: '#e67e22', 
+                        backgroundColor: 'rgba(230, 126, 34, 0.1)',
                         tension: 0.4,
                         fill: true
                     }

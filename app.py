@@ -86,6 +86,11 @@ def logout():
 def index():
     return render_template('index.html', username=current_user.username)
 
+@app.route('/detailed')
+@login_required
+def detailed_page():
+    return render_template('detailed_expenses.html')
+
 @app.route('/cards')
 @login_required
 def cards_page():
@@ -141,12 +146,27 @@ def get_years():
 @app.route('/api/balance', methods=['GET'])
 @login_required
 def get_total_balance():
+    # Saldo = Total Rendas - (Gastos Consolidados + Gastos Detalhados NÃO Crédito)
+    
+    # 1. Total Rendas
     pipeline_inc = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
-    pipeline_exp = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
     res_inc = list(db.incomes.aggregate(pipeline_inc))
-    res_exp = list(db.expenses.aggregate(pipeline_exp))
     total_inc = res_inc[0]['total'] if res_inc else 0
+    
+    # 2. Total Gastos (Lógica Híbrida)
+    pipeline_exp = [
+        {"$match": {
+            "user_id": ObjectId(current_user.id),
+            "$or": [
+                {"is_consolidated": True}, # Contas Macro (Faturas, Luz, etc)
+                {"payment_method": {"$ne": "credito"}} # Gastos Micro que saem da conta (Débito, Pix)
+            ]
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]
+    res_exp = list(db.expenses.aggregate(pipeline_exp))
     total_exp = res_exp[0]['total'] if res_exp else 0
+    
     return jsonify({"balance": total_inc - total_exp})
 
 # --- Cartões ---
@@ -255,7 +275,8 @@ def expenses(expense_id=None):
             "payment_method": data.get('payment_method'),
             "card_id": ObjectId(card_id) if card_id else None,
             "installments": data.get('installments'),
-            "observation": data.get('observation')
+            "observation": data.get('observation'),
+            "is_consolidated": data.get('is_consolidated', False)
         }
         db.expenses.update_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
         return jsonify({"status": "updated"})
@@ -263,40 +284,33 @@ def expenses(expense_id=None):
     if request.method == 'POST':
         data = request.json
         
-        # Lógica de Parcelamento Automático
+        # Lógica de Parcelamento (Apenas para Gastos Detalhados/Micro)
         installments_str = data.get('installments')
         base_date = datetime.strptime(data['date'], '%Y-%m-%d')
+        is_consolidated = data.get('is_consolidated', False)
         
-        # Verifica se é parcelado (ex: "1/6")
         match = re.match(r'(\d+)/(\d+)', str(installments_str))
         
-        if match:
+        if match and not is_consolidated:
             current_inst = int(match.group(1))
             total_inst = int(match.group(2))
             
-            # Loop para criar/verificar todas as parcelas
             for i in range(1, total_inst + 1):
-                # Calcula a data da parcela i
-                # Se a parcela atual é 3, a parcela 1 foi há 2 meses atrás
                 month_offset = i - current_inst
                 inst_date = base_date + relativedelta(months=month_offset)
                 inst_date_str = inst_date.strftime('%Y-%m-%d')
-                
                 inst_label = f"{i}/{total_inst}"
                 
-                # Verifica duplicidade
                 exists = db.expenses.find_one({
                     "user_id": ObjectId(current_user.id),
                     "description": data['description'],
                     "amount": float(data['amount']),
                     "installments": inst_label
-                    # Não checa data exata pois pode variar o dia, mas checa parcela e valor
                 })
                 
                 if not exists:
                     obs = data.get('observation', '')
-                    if i != current_inst:
-                        obs = f"[Gerado Auto] {obs}".strip()
+                    if i != current_inst: obs = f"[Gerado Auto] {obs}".strip()
                     
                     new_expense = {
                         "user_id": ObjectId(current_user.id),
@@ -310,14 +324,13 @@ def expenses(expense_id=None):
                         "card_id": ObjectId(data.get('card_id')) if data.get('card_id') else None,
                         "installments": inst_label,
                         "observation": obs,
+                        "is_consolidated": False,
                         "created_at": datetime.utcnow()
                     }
                     db.expenses.insert_one(new_expense)
-            
             return jsonify({"status": "success", "message": "Parcelas geradas"})
         
         else:
-            # Gasto normal (não parcelado)
             new_expense = {
                 "user_id": ObjectId(current_user.id),
                 "description": data['description'],
@@ -330,6 +343,7 @@ def expenses(expense_id=None):
                 "card_id": ObjectId(data.get('card_id')) if data.get('card_id') else None,
                 "installments": data.get('installments'),
                 "observation": data.get('observation'),
+                "is_consolidated": is_consolidated,
                 "created_at": datetime.utcnow()
             }
             res = db.expenses.insert_one(new_expense)
@@ -337,6 +351,21 @@ def expenses(expense_id=None):
             return jsonify([serialize_doc(new_expense)])
             
     query = {"user_id": ObjectId(current_user.id)}
+    
+    # Filtro de Tipo (Consolidado vs Detalhado)
+    view_type = request.args.get('view_type')
+    if view_type == 'consolidated':
+        # Dashboard: Mostra Consolidados + Detalhados que NÃO são Crédito
+        query["$or"] = [
+            {"is_consolidated": True},
+            {"payment_method": {"$ne": "credito"}}
+        ]
+    elif view_type == 'detailed':
+        # Página Detalhada: Mostra tudo (para conferência) ou só os não consolidados?
+        # Geralmente detalhado mostra tudo, ou só os micro gastos.
+        # Vamos mostrar tudo, mas talvez o front filtre.
+        pass 
+    
     search_term = request.args.get('search')
     if search_term:
         regex = re.compile(search_term, re.IGNORECASE)

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gastos Detalhados - FinScope</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Fin<span>Scope</span></h1>
+            </div>
+            <div class="user-controls">
+                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <span class="divider">|</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            <div class="section-header">
+                <h2>Gastos Detalhados (Micro)</h2>
+            </div>
+
+            <!-- Gráfico Detalhado -->
+            <section class="charts-container">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Evolução de Gastos</h3>
+                        <div class="chart-controls-wrapper">
+                            <div id="det-zoom-container" style="display: none;">
+                                <span id="det-zoom-label">30 Dias</span>
+                                <input type="range" id="det-chart-zoom" min="5" max="30" step="5" value="30">
+                            </div>
+                            <div class="chart-controls">
+                                <button class="det-chart-btn" data-granularity="day" title="Diário">Diário</button>
+                                <button class="det-chart-btn active" data-granularity="month" title="Mensal">Mensal</button>
+                                <button class="det-chart-btn" data-granularity="year" title="Anual">Anual</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="detailedChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Formulário Completo (Colapsável) -->
+            <section class="input-section collapsible collapsed">
+                <div class="section-header">
+                    <h2>Novo Registro Detalhado</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="section-content">
+                    <form id="expense-form">
+                        <input type="hidden" id="exp-id">
+                        
+                        <div class="form-group">
+                            <label>Descrição</label>
+                            <input type="text" id="exp-desc" required placeholder="Ex: Almoço, Uber, Compra Parcelada">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Valor (R$)</label>
+                                <input type="number" id="exp-amount" step="0.01" required placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Data</label>
+                                <input type="date" id="exp-date" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Estabelecimento</label>
+                                <input type="text" id="exp-establishment" placeholder="Ex: Restaurante X">
+                            </div>
+                            <div class="form-group">
+                                <label>Comprador</label>
+                                <select id="exp-buyer">
+                                    <!-- JS populates -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Categoria</label>
+                                <select id="exp-category">
+                                    <!-- JS populates -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Método</label>
+                                <select id="exp-method" onchange="toggleCardSelect()">
+                                    <option value="debito">Débito</option>
+                                    <option value="credito">Crédito</option>
+                                    <option value="pix">PIX</option>
+                                    <option value="dinheiro">Dinheiro</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row" id="card-select-group" style="display: none;">
+                            <div class="form-group">
+                                <label>Cartão</label>
+                                <select id="exp-card">
+                                    <!-- JS populates -->
+                                </select>
+                            </div>
+                            <div class="form-group" id="installments-group">
+                                <label>Parcelas</label>
+                                <input type="text" id="exp-installments" placeholder="Ex: 1/10">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Observação</label>
+                            <input type="text" id="exp-obs" placeholder="Detalhes opcionais">
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="btn-save-expense" class="btn-primary btn-danger">Registrar Gasto</button>
+                            <button type="button" id="btn-cancel-edit" class="btn-secondary" style="display: none;">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Tabela de Histórico Completo -->
+            <section class="history-section">
+                <div class="section-header">
+                    <h3>Histórico Completo</h3>
+                    <div class="search-bar" style="margin-bottom: 0; border: none; padding: 0;">
+                        <input type="text" id="search-term" placeholder="Buscar...">
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Comprador</th>
+                                <th>Detalhes</th>
+                                <th>Valor</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- JS will populate -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
