@@ -15,7 +15,7 @@
                 <h1>Fin<span>Scope</span></h1>
             </div>
             <div class="user-controls">
-                <a href="{{ url_for('wallet_page') }}" class="nav-link">Minha Carteira</a> <!-- Link Adicionado -->
+                <a href="{{ url_for('wallet_page') }}" class="nav-link">Minha Carteira</a>
                 <a href="{{ url_for('detailed_page') }}" class="nav-link">Gastos Detalhados</a>
                 <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
                 <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
@@ -75,8 +75,14 @@
             <section class="charts-container">
                 <div class="chart-card">
                     <div class="chart-header">
-                        <h3>Fluxo de Caixa</h3>
+                        <h3>Evolução Financeira</h3>
                         <div class="chart-controls-wrapper">
+                            <!-- Seletor de Modo de Visualização -->
+                            <select id="chart-view-mode" class="chart-select">
+                                <option value="general">Visão Geral</option>
+                                <option value="category">Por Categoria</option>
+                            </select>
+
                             <div id="zoom-container" style="display: none;">
                                 <span id="zoom-label">30 Dias</span>
                                 <input type="range" id="chart-zoom" min="5" max="30" step="5" value="30">

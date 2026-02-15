@@ -216,6 +216,17 @@ header {
     gap: 1.5rem;
 }
 
+.chart-select {
+    background-color: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    outline: none;
+}
+
 #zoom-container, #det-zoom-container {
     display: flex;
     align-items: center;
