@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const zoomContainer = document.getElementById('zoom-container');
     const chartZoom = document.getElementById('chart-zoom');
     const zoomLabel = document.getElementById('zoom-label');
+    const viewModeSelect = document.getElementById('chart-view-mode'); // View Mode Select
     
     // Chart Controls (Detailed)
     const detChartBtns = document.querySelectorAll('.det-chart-btn');
@@ -63,6 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const investmentsContainer = document.getElementById('investments-container');
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
+
+    // Wallet Elements
+    const walletForm = document.getElementById('wallet-form');
+    const walletTable = document.querySelector('#wallet-table tbody');
+    const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
 
     // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
@@ -188,6 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
         chartZoom.addEventListener('input', () => {
             chartDays = parseInt(chartZoom.value);
             zoomLabel.textContent = `${chartDays} Dias`;
+            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+        });
+    }
+
+    // View Mode Listener
+    if(viewModeSelect) {
+        viewModeSelect.addEventListener('change', () => {
             updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
         });
     }
@@ -888,7 +901,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData(isSearch = false) {
         try {
             // Dashboard loads Consolidated + Non-Credit Detailed
-            let expenseUrl = '/api/expenses?view_type=consolidated';
             let macroUrl = '/api/macro-expenses'; // NEW
             
             // Apply dashboard filters
@@ -912,7 +924,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if(currentFilter !== 'all') {
-                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
                 macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
             
@@ -921,9 +932,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
 
-            const [incomesRes, expensesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
+            const [incomesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch(incomeUrl), 
-                fetch(expenseUrl),
                 fetch(macroUrl),
                 fetch('/api/investments/history'),
                 fetch('/api/investments'),
@@ -931,14 +941,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             const incomes = await incomesRes.json();
-            const expenses = await expensesRes.json();
             const macroExpenses = await macroRes.json();
             const investmentsHistory = await investmentsRes.json();
             const currentInvestments = await allInvestmentsRes.json();
             const balanceData = await balanceRes.json();
             
             // Combine Micro and Macro for Dashboard
-            const allExpenses = [...expenses, ...macroExpenses];
+            const allExpenses = [...macroExpenses];
             
             cachedIncomes = incomes;
             cachedExpenses = allExpenses;
@@ -1196,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', () => {
             datasets.push({
                 label: 'Rendas',
                 data: sortedKeys.map(k => dataMap[k].income),
-                borderColor: '#2ecc71',
+                borderColor: '#2ecc71', 
                 backgroundColor: 'rgba(46, 204, 113, 0.05)',
                 tension: 0.4,
                 fill: true,
@@ -1214,7 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let colorIndex = 0;
             allCategories.forEach(cat => {
-                // Check if category has any value > 0
+                // Check if category has any value > 0 in the VISIBLE range
                 const totalVal = sortedKeys.reduce((sum, k) => sum + dataMap[k][cat], 0);
                 if (totalVal > 0) {
                     const color = colors[colorIndex % colors.length];
@@ -1268,14 +1277,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     x: { grid: { display: false }, ticks: { color: '#8f8681' } }
                 }
             }
-        });
-    }
-    
-    // Add listener for View Mode change
-    const viewModeSelect = document.getElementById('chart-view-mode');
-    if(viewModeSelect) {
-        viewModeSelect.addEventListener('change', () => {
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
         });
     }
     
