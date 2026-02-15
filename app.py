@@ -156,14 +156,12 @@ def get_years():
 @app.route('/api/balance', methods=['GET'])
 @login_required
 def get_total_balance():
-    # NOVA LÓGICA: Saldo = Soma das Carteiras (Wallets)
     pipeline = [
         {"$match": {"user_id": ObjectId(current_user.id)}},
         {"$group": {"_id": None, "total": {"$sum": "$balance"}}}
     ]
     res = list(db.wallets.aggregate(pipeline))
     total_balance = res[0]['total'] if res else 0
-    
     return jsonify({"balance": total_balance})
 
 # --- CARTEIRA (WALLETS) ---
@@ -261,10 +259,25 @@ def card_invoice(card_id):
         "expenses": [serialize_doc(e, 'micro') for e in expenses]
     })
 
-# --- Rendas ---
+# --- Rendas (ATUALIZADO COM DELETE/PUT) ---
 @app.route('/api/incomes', methods=['GET', 'POST'])
+@app.route('/api/incomes/<income_id>', methods=['PUT', 'DELETE'])
 @login_required
-def incomes():
+def incomes(income_id=None):
+    if request.method == 'DELETE':
+        db.incomes.delete_one({"_id": ObjectId(income_id), "user_id": ObjectId(current_user.id)})
+        return jsonify({"status": "deleted"})
+
+    if request.method == 'PUT':
+        data = request.json
+        update_data = {
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "date": data['date']
+        }
+        db.incomes.update_one({"_id": ObjectId(income_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
+        return jsonify({"status": "updated"})
+
     if request.method == 'POST':
         data = request.json
         new_income = {

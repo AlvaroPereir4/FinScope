@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const consCategorySelect = document.getElementById('cons-category');
     const consCardSelect = document.getElementById('cons-card');
     const btnSaveConsolidated = consolidatedForm ? consolidatedForm.querySelector('button[type="submit"]') : null;
+    const btnSaveIncome = incomeForm ? incomeForm.querySelector('button[type="submit"]') : null;
 
     // Dashboard Filters
     const filterBtns = document.querySelectorAll('.filter-btn');
@@ -78,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBuyers = [];
     let isEditing = false;
     let editingId = null;
-    let editingType = null; // 'micro' or 'macro'
+    let editingType = null; // 'micro', 'macro', 'income'
     let currentFilter = 'all'; // Default All
     let selectedYear = new Date().getFullYear().toString();
     
@@ -640,11 +641,17 @@ document.addEventListener('DOMContentLoaded', () => {
         let data = {};
 
         if (isIncome) {
+            url = '/api/incomes'; // Explicitly set URL for income
             data = {
                 description: document.getElementById('inc-desc').value,
                 amount: parseFloat(document.getElementById('inc-amount').value),
                 date: document.getElementById('inc-date').value
             };
+            
+            if (isEditing && editingType === 'income') {
+                url += `/${editingId}`;
+                method = 'PUT';
+            }
         } else if (type === 'consolidated') {
             // Macro Expense
             url = '/api/macro-expenses'; // NEW ENDPOINT
@@ -714,30 +721,56 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Edit Logic ---
 
     window.editExpense = function(expenseStr) {
-        const expense = JSON.parse(decodeURIComponent(expenseStr));
+        const item = JSON.parse(decodeURIComponent(expenseStr));
         
         isEditing = true;
-        editingId = expense._id;
+        editingId = item._id;
         
-        if (expense.source === 'macro') {
+        if (item.type === 'income') {
+            // Income Edit
+            editingType = 'income';
+            if(incomeForm) {
+                document.getElementById('inc-desc').value = item.description;
+                document.getElementById('inc-amount').value = item.amount;
+                document.getElementById('inc-date').value = item.date;
+                
+                if(btnSaveIncome) btnSaveIncome.textContent = 'Atualizar Renda';
+                
+                const section = incomeForm.closest('.input-section');
+                if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
+                incomeForm.scrollIntoView({ behavior: 'smooth' });
+                
+                // Add cancel button
+                let cancelBtn = document.getElementById('btn-cancel-income');
+                if(!cancelBtn) {
+                    cancelBtn = document.createElement('button');
+                    cancelBtn.id = 'btn-cancel-income';
+                    cancelBtn.type = 'button';
+                    cancelBtn.className = 'btn-secondary';
+                    cancelBtn.textContent = 'Cancelar';
+                    cancelBtn.style.marginTop = '1rem';
+                    cancelBtn.onclick = cancelEdit;
+                    incomeForm.appendChild(cancelBtn);
+                }
+                cancelBtn.style.display = 'block';
+            }
+        } else if (item.is_consolidated || item.source === 'macro') {
             // Macro Edit
             editingType = 'macro';
             if(consolidatedForm) {
-                document.getElementById('cons-desc').value = expense.description;
-                document.getElementById('cons-amount').value = expense.amount;
-                document.getElementById('cons-date').value = expense.date;
-                document.getElementById('cons-category').value = expense.category || '';
-                document.getElementById('cons-card').value = expense.card_id || '';
-                document.getElementById('cons-method').value = expense.payment_method || 'debito';
+                document.getElementById('cons-desc').value = item.description;
+                document.getElementById('cons-amount').value = item.amount;
+                document.getElementById('cons-date').value = item.date;
+                document.getElementById('cons-category').value = item.category || '';
+                document.getElementById('cons-card').value = item.card_id || '';
+                document.getElementById('cons-method').value = item.payment_method || 'debito';
                 
                 if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Atualizar Conta';
                 
-                // Open section
                 const section = consolidatedForm.closest('.input-section');
                 if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
                 consolidatedForm.scrollIntoView({ behavior: 'smooth' });
                 
-                // Add cancel button logic for macro
                 let cancelBtn = document.getElementById('btn-cancel-macro');
                 if(!cancelBtn) {
                     cancelBtn = document.createElement('button');
@@ -754,19 +787,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Micro Edit
             editingType = 'micro';
-            document.getElementById('exp-desc').value = expense.description;
-            document.getElementById('exp-amount').value = expense.amount;
-            document.getElementById('exp-date').value = expense.date;
-            document.getElementById('exp-establishment').value = expense.establishment || '';
-            document.getElementById('exp-buyer').value = expense.buyer || '';
-            document.getElementById('exp-category').value = expense.category || '';
-            document.getElementById('exp-method').value = expense.payment_method || 'debito';
-            document.getElementById('exp-obs').value = expense.observation || '';
+            document.getElementById('exp-desc').value = item.description;
+            document.getElementById('exp-amount').value = item.amount;
+            document.getElementById('exp-date').value = item.date;
+            document.getElementById('exp-establishment').value = item.establishment || '';
+            document.getElementById('exp-buyer').value = item.buyer || '';
+            document.getElementById('exp-category').value = item.category || '';
+            document.getElementById('exp-method').value = item.payment_method || 'debito';
+            document.getElementById('exp-obs').value = item.observation || '';
             
-            if (expense.payment_method === 'credito') {
+            if (item.payment_method === 'credito') {
                 cardGroup.style.display = 'grid';
-                document.getElementById('exp-card').value = expense.card_id || '';
-                document.getElementById('exp-installments').value = expense.installments || '';
+                document.getElementById('exp-card').value = item.card_id || '';
+                document.getElementById('exp-installments').value = item.installments || '';
             } else {
                 cardGroup.style.display = 'none';
             }
@@ -781,10 +814,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.deleteExpense = async function(id, source) {
-        if(!confirm('Tem certeza que deseja excluir este gasto?')) return;
+        if(!confirm('Tem certeza que deseja excluir este registro?')) return;
         
         let url = `/api/expenses/${id}`;
         if(source === 'macro') url = `/api/macro-expenses/${id}`;
+        else if(source === 'income') url = `/api/incomes/${id}`; // Need to implement DELETE for incomes
         
         try {
             const res = await fetch(url, { method: 'DELETE' });
@@ -813,6 +847,14 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('cons-date').value = today;
             if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Registrar Saída';
             const cancelBtn = document.getElementById('btn-cancel-macro');
+            if(cancelBtn) cancelBtn.style.display = 'none';
+        }
+        
+        if(incomeForm) {
+            incomeForm.reset();
+            document.getElementById('inc-date').value = today;
+            if(btnSaveIncome) btnSaveIncome.textContent = 'Adicionar Renda';
+            const cancelBtn = document.getElementById('btn-cancel-income');
             if(cancelBtn) cancelBtn.style.display = 'none';
         }
     }
@@ -901,6 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData(isSearch = false) {
         try {
             // Dashboard loads Consolidated + Non-Credit Detailed
+            let expenseUrl = '/api/expenses?view_type=consolidated';
             let macroUrl = '/api/macro-expenses'; // NEW
             
             // Apply dashboard filters
@@ -924,6 +967,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if(currentFilter !== 'all') {
+                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
                 macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
             
@@ -932,8 +976,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
 
-            const [incomesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
+            const [incomesRes, expensesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch(incomeUrl), 
+                fetch(expenseUrl),
                 fetch(macroUrl),
                 fetch('/api/investments/history'),
                 fetch('/api/investments'),
@@ -941,13 +986,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             const incomes = await incomesRes.json();
+            const expenses = await expensesRes.json();
             const macroExpenses = await macroRes.json();
             const investmentsHistory = await investmentsRes.json();
             const currentInvestments = await allInvestmentsRes.json();
             const balanceData = await balanceRes.json();
             
             // Combine Micro and Macro for Dashboard
-            const allExpenses = [...macroExpenses];
+            const allExpenses = [...expenses, ...macroExpenses];
             
             cachedIncomes = incomes;
             cachedExpenses = allExpenses;
@@ -958,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Pagination Logic
             allTableData = [
-                ...incomes.map(i => ({...i, type: 'income'})),
+                ...incomes.map(i => ({...i, type: 'income', source: 'income'})), // Add source
                 ...allExpenses.map(e => ({...e, type: 'expense'}))
             ];
             allTableData.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1078,13 +1124,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(item.card_name) details += ` <span class="badge card">💳 ${item.card_name}</span>`;
                 }
                 else details = `<span class="badge method">${item.payment_method || '-'}</span>`;
+            } else {
+                details = `<span class="badge" style="background:#2ecc71;color:#fff">Renda</span>`;
             }
 
             const itemStr = encodeURIComponent(JSON.stringify(item));
-            const actions = !isIncome ? `
+            const actions = `
                 <button class="btn-icon-small edit" onclick="editExpense('${itemStr}')">✎</button>
-                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}', '${item.source}')">🗑</button>
-            ` : '';
+                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}', '${item.source || 'income'}')">🗑</button>
+            `;
 
             row.innerHTML = `
                 <td>${formatDate(item.date)}</td>
@@ -1106,52 +1154,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = document.getElementById('financeChart').getContext('2d');
         const dataMap = {};
         
-        const viewMode = document.getElementById('chart-view-mode').value; // Get view mode
-
         const getKey = (dateStr) => {
             if (chartGranularity === 'day') return dateStr; 
             if (chartGranularity === 'year') return dateStr.substring(0, 4); 
             return dateStr.substring(0, 7); 
         };
 
-        if (viewMode === 'general') {
-            // --- GENERAL MODE (Income vs Expense vs Investment) ---
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                if (incomes.includes(item)) dataMap[key].income += item.amount;
-                else dataMap[key].expense += item.amount;
-            });
+        [...incomes, ...expenses].forEach(item => {
+            const key = getKey(item.date);
+            if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
+            if (incomes.includes(item)) dataMap[key].income += item.amount;
+            else dataMap[key].expense += item.amount;
+        });
 
-            investments.forEach(inv => {
-                if(inv.type === 'contribution') {
-                    const key = getKey(inv.date);
-                    if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                    dataMap[key].investment += inv.amount;
-                }
-            });
-        } else {
-            // --- CATEGORY MODE (Income vs Category A vs Category B...) ---
-            // 1. Identify all unique categories present in the data
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            // 2. Initialize dataMap with dynamic keys
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) {
-                    dataMap[key] = { income: 0 };
-                    allCategories.forEach(cat => dataMap[key][cat] = 0);
-                }
-                
-                if (incomes.includes(item)) {
-                    dataMap[key].income += item.amount;
-                } else {
-                    const cat = item.category || 'Outros';
-                    dataMap[key][cat] += item.amount;
-                }
-            });
-        }
+        investments.forEach(inv => {
+            if(inv.type === 'contribution') {
+                const key = getKey(inv.date);
+                if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
+                dataMap[key].investment += inv.amount;
+            }
+        });
 
         let sortedKeys = Object.keys(dataMap).sort();
         
@@ -1169,84 +1191,38 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${m}/${y}`;
         });
 
-        // --- DATASETS GENERATION ---
-        let datasets = [];
-
-        if (viewMode === 'general') {
-            datasets = [
-                { 
-                    label: 'Rendas', 
-                    data: sortedKeys.map(k => dataMap[k].income), 
-                    borderColor: '#2ecc71', 
-                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                    tension: 0.4, 
-                    fill: true
-                },
-                { 
-                    label: 'Saídas', 
-                    data: sortedKeys.map(k => dataMap[k].expense), 
-                    borderColor: '#e74c3c', 
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                { 
-                    label: 'Investido', 
-                    data: sortedKeys.map(k => dataMap[k].investment), 
-                    borderColor: '#3498db', 
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }
-            ];
-        } else {
-            // Category Mode Datasets
-            // 1. Income (Always present)
-            datasets.push({
-                label: 'Rendas',
-                data: sortedKeys.map(k => dataMap[k].income),
-                borderColor: '#2ecc71', 
-                backgroundColor: 'rgba(46, 204, 113, 0.05)',
-                tension: 0.4,
-                fill: true,
-                borderDash: [5, 5] // Dashed line for income to differentiate
-            });
-
-            // 2. Generate colors for categories
-            const colors = [
-                '#e74c3c', '#e67e22', '#f1c40f', '#9b59b6', '#3498db', 
-                '#1abc9c', '#34495e', '#7f8c8d', '#c0392b', '#d35400'
-            ];
-            
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            let colorIndex = 0;
-            allCategories.forEach(cat => {
-                // Check if category has any value > 0 in the VISIBLE range
-                const totalVal = sortedKeys.reduce((sum, k) => sum + dataMap[k][cat], 0);
-                if (totalVal > 0) {
-                    const color = colors[colorIndex % colors.length];
-                    datasets.push({
-                        label: cat,
-                        data: sortedKeys.map(k => dataMap[k][cat]),
-                        borderColor: color,
-                        backgroundColor: color + '1A', // 10% opacity
-                        tension: 0.4,
-                        fill: false // Don't fill categories to avoid mess
-                    });
-                    colorIndex++;
-                }
-            });
-        }
-
         if (financeChart) financeChart.destroy();
         
         financeChart = new Chart(ctx, {
             type: 'line', 
             data: {
                 labels: labels,
-                datasets: datasets
+                datasets: [
+                    { 
+                        label: 'Rendas', 
+                        data: sortedKeys.map(k => dataMap[k].income), 
+                        borderColor: '#2ecc71', 
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.4, 
+                        fill: true
+                    },
+                    { 
+                        label: 'Saídas', 
+                        data: sortedKeys.map(k => dataMap[k].expense), 
+                        borderColor: '#e74c3c', 
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    { 
+                        label: 'Investido', 
+                        data: sortedKeys.map(k => dataMap[k].investment), 
+                        borderColor: '#3498db', 
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
             },
             options: {
                 responsive: true, 
