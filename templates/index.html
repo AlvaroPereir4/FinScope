@@ -15,6 +15,7 @@
                 <h1>Fin<span>Scope</span></h1>
             </div>
             <div class="user-controls">
+                <a href="{{ url_for('wallet_page') }}" class="nav-link">Minha Carteira</a> <!-- Link Adicionado -->
                 <a href="{{ url_for('detailed_page') }}" class="nav-link">Gastos Detalhados</a>
                 <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
                 <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
@@ -192,10 +193,6 @@
                             <!-- JS will populate -->
                         </tbody>
                     </table>
-                </div>
-                <!-- Paginação -->
-                <div class="pagination-controls" id="pagination-controls">
-                    <!-- JS populates -->
                 </div>
             </section>
         </main>

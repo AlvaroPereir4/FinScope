@@ -64,6 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
 
+    // Wallet Elements
+    const walletForm = document.getElementById('wallet-form');
+    const walletTable = document.querySelector('#wallet-table tbody');
+    const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
+
     // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
 
@@ -126,6 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(window.location.pathname === '/detailed') {
         loadCards(); 
         loadDetailedData();
+    }
+
+    if(document.getElementById('wallet-table')) {
+        loadWallets();
     }
 
     // --- Event Listeners ---
@@ -290,6 +299,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if(walletForm) {
+        walletForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('wallet-id').value;
+            const data = {
+                name: document.getElementById('wallet-name').value,
+                balance: parseFloat(document.getElementById('wallet-balance').value)
+            };
+            const url = id ? `/api/wallets/${id}` : '/api/wallets';
+            const method = id ? 'PUT' : 'POST';
+            try {
+                const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                if(res.ok) { document.getElementById('wallet-modal').style.display = 'none'; loadWallets(); }
+            } catch(err) { console.error(err); }
+        });
+    }
+
     // --- Functions ---
 
     function toggleCardSelect() {
@@ -391,6 +417,51 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // --- Wallet Logic ---
+
+    async function loadWallets() {
+        try {
+            const res = await fetch('/api/wallets');
+            const wallets = await res.json();
+            
+            walletTable.innerHTML = '';
+            let total = 0;
+            
+            wallets.forEach(w => {
+                total += w.balance;
+                const row = document.createElement('tr');
+                const wStr = encodeURIComponent(JSON.stringify(w));
+                
+                row.innerHTML = `
+                    <td>${w.name}</td>
+                    <td class="${w.balance >= 0 ? 'amount-positive' : 'amount-negative'}">${formatCurrency(w.balance)}</td>
+                    <td>
+                        <button class="btn-icon-small edit" onclick="editWallet('${wStr}')">✎</button>
+                        <button class="btn-icon-small delete" onclick="deleteWallet('${w._id}')">🗑</button>
+                    </td>
+                `;
+                walletTable.appendChild(row);
+            });
+            
+            totalWalletBalanceEl.textContent = formatCurrency(total);
+        } catch(err) { console.error(err); }
+    }
+
+    window.editWallet = function(wStr) {
+        const w = JSON.parse(decodeURIComponent(wStr));
+        document.getElementById('wallet-id').value = w._id;
+        document.getElementById('wallet-name').value = w.name;
+        document.getElementById('wallet-balance').value = w.balance;
+        document.getElementById('wallet-modal-title').textContent = 'Editar Conta';
+        document.getElementById('wallet-modal').style.display = 'flex';
+    };
+
+    window.deleteWallet = async function(id) {
+        if(!confirm('Excluir esta conta?')) return;
+        await fetch(`/api/wallets/${id}`, { method: 'DELETE' });
+        loadWallets();
+    };
 
     // --- Investments & Goals Logic ---
 
@@ -822,6 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData(isSearch = false) {
         try {
             // Dashboard loads Consolidated + Non-Credit Detailed
+            let expenseUrl = '/api/expenses?view_type=consolidated';
             let macroUrl = '/api/macro-expenses'; // NEW
             
             // Apply dashboard filters
@@ -845,6 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if(currentFilter !== 'all') {
+                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
                 macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
             
@@ -853,8 +926,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
 
-            const [incomesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
+            const [incomesRes, expensesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch(incomeUrl), 
+                fetch(expenseUrl),
                 fetch(macroUrl),
                 fetch('/api/investments/history'),
                 fetch('/api/investments'),
@@ -862,13 +936,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             const incomes = await incomesRes.json();
+            const expenses = await expensesRes.json();
             const macroExpenses = await macroRes.json();
             const investmentsHistory = await investmentsRes.json();
             const currentInvestments = await allInvestmentsRes.json();
             const balanceData = await balanceRes.json();
             
             // Combine Micro and Macro for Dashboard
-            const allExpenses = [...macroExpenses];
+            const allExpenses = [...expenses, ...macroExpenses];
             
             cachedIncomes = incomes;
             cachedExpenses = allExpenses;
@@ -944,7 +1019,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateDashboard(incomes, expenses, currentInvestments, balanceData) {
         const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
         const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
-        const balance = totalIncome - totalExpense;
+        
+        // CORREÇÃO AQUI: Usar o saldo da API (balanceData.balance)
+        const balance = balanceData.balance; 
 
         document.getElementById('total-income').textContent = formatCurrency(totalIncome);
         document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
@@ -954,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
         balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
 
         const totalInvested = currentInvestments.reduce((sum, inv) => sum + inv.current_amount, 0);
-        const netWorth = balanceData.balance + totalInvested;
+        const netWorth = balance + totalInvested;
 
         document.getElementById('total-invested-dash').textContent = formatCurrency(totalInvested);
         document.getElementById('net-worth').textContent = formatCurrency(netWorth);
