@@ -36,12 +36,13 @@ def load_user(user_id):
     except: pass
     return None
 
-def serialize_doc(doc):
+def serialize_doc(doc, source=None):
     if not doc: return None
     doc['_id'] = str(doc['_id'])
     if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
     if 'card_id' in doc and doc['card_id']: doc['card_id'] = str(doc['card_id'])
     if 'investment_id' in doc: doc['investment_id'] = str(doc['investment_id'])
+    if source: doc['source'] = source # Identifica se é macro ou micro
     return doc
 
 # --- Rotas Auth ---
@@ -136,9 +137,13 @@ def get_years():
     ]
     years_inc = list(db.incomes.aggregate(pipeline))
     years_exp = list(db.expenses.aggregate(pipeline))
+    years_macro = list(db.macro_expenses.aggregate(pipeline)) # Inclui Macro
+    
     all_years = set()
     for y in years_inc: all_years.add(y['_id'])
     for y in years_exp: all_years.add(y['_id'])
+    for y in years_macro: all_years.add(y['_id'])
+    
     current_year = str(datetime.now().year)
     all_years.add(current_year)
     return jsonify(sorted(list(all_years), reverse=True))
@@ -151,21 +156,23 @@ def get_total_balance():
     res_inc = list(db.incomes.aggregate(pipeline_inc))
     total_inc = res_inc[0]['total'] if res_inc else 0
     
-    # 2. Total Gastos (Macro + Micro não crédito)
+    # 2. Total Gastos Micro (NÃO Crédito)
     pipeline_exp = [
         {"$match": {
             "user_id": ObjectId(current_user.id),
-            "$or": [
-                {"is_consolidated": True},
-                {"payment_method": {"$ne": "credito"}}
-            ]
+            "payment_method": {"$ne": "credito"}
         }},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
     ]
     res_exp = list(db.expenses.aggregate(pipeline_exp))
-    total_exp = res_exp[0]['total'] if res_exp else 0
+    total_micro = res_exp[0]['total'] if res_exp else 0
     
-    return jsonify({"balance": total_inc - total_exp})
+    # 3. Total Gastos Macro (Tudo sai da conta)
+    pipeline_macro = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
+    res_macro = list(db.macro_expenses.aggregate(pipeline_macro))
+    total_macro = res_macro[0]['total'] if res_macro else 0
+    
+    return jsonify({"balance": total_inc - (total_micro + total_macro)})
 
 # --- Cartões ---
 @app.route('/api/cards', methods=['GET', 'POST'])
@@ -221,10 +228,10 @@ def card_invoice(card_id):
         "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')},
         "total": total_amount,
         "buyers_summary": buyers_summary,
-        "expenses": [serialize_doc(e) for e in expenses]
+        "expenses": [serialize_doc(e, 'micro') for e in expenses]
     })
 
-# --- Rendas e Gastos ---
+# --- Rendas ---
 @app.route('/api/incomes', methods=['GET', 'POST'])
 @login_required
 def incomes():
@@ -252,6 +259,65 @@ def incomes():
     incomes = list(db.incomes.find(query).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
+# --- GASTOS MACRO (NOVA COLLECTION) ---
+@app.route('/api/macro-expenses', methods=['GET', 'POST'])
+@app.route('/api/macro-expenses/<expense_id>', methods=['PUT', 'DELETE'])
+@login_required
+def macro_expenses(expense_id=None):
+    if request.method == 'DELETE':
+        db.macro_expenses.delete_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)})
+        return jsonify({"status": "deleted"})
+
+    if request.method == 'PUT':
+        data = request.json
+        card_id = data.get('card_id')
+        update_data = {
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "category": data.get('category', 'Geral'),
+            "date": data['date'],
+            "payment_method": data.get('payment_method', 'debito'),
+            "card_id": ObjectId(card_id) if card_id else None
+        }
+        db.macro_expenses.update_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
+        return jsonify({"status": "updated"})
+
+    if request.method == 'POST':
+        data = request.json
+        card_id = data.get('card_id')
+        new_expense = {
+            "user_id": ObjectId(current_user.id),
+            "description": data['description'],
+            "amount": float(data['amount']),
+            "category": data.get('category', 'Geral'),
+            "date": data['date'],
+            "payment_method": data.get('payment_method', 'debito'),
+            "card_id": ObjectId(card_id) if card_id else None,
+            "is_consolidated": True, # Flag mantida para compatibilidade visual
+            "created_at": datetime.utcnow()
+        }
+        res = db.macro_expenses.insert_one(new_expense)
+        new_expense['_id'] = res.inserted_id
+        return jsonify([serialize_doc(new_expense, 'macro')])
+
+    # GET
+    query = {"user_id": ObjectId(current_user.id)}
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date or end_date:
+        query["date"] = {}
+        if start_date: query["date"]["$gte"] = start_date
+        if end_date: query["date"]["$lte"] = end_date
+
+    expenses = list(db.macro_expenses.find(query).sort("date", -1))
+    for expense in expenses:
+        if expense.get('card_id'):
+            card = db.credit_cards.find_one({"_id": expense['card_id']})
+            if card: expense['card_name'] = card['name']
+            
+    return jsonify([serialize_doc(e, 'macro') for e in expenses])
+
+# --- GASTOS MICRO (Collection Antiga) ---
 @app.route('/api/expenses', methods=['GET', 'POST'])
 @app.route('/api/expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -273,22 +339,19 @@ def expenses(expense_id=None):
             "payment_method": data.get('payment_method'),
             "card_id": ObjectId(card_id) if card_id else None,
             "installments": data.get('installments'),
-            "observation": data.get('observation'),
-            "is_consolidated": data.get('is_consolidated', False)
+            "observation": data.get('observation')
         }
         db.expenses.update_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
         return jsonify({"status": "updated"})
 
     if request.method == 'POST':
         data = request.json
-        
         installments_str = data.get('installments')
         base_date = datetime.strptime(data['date'], '%Y-%m-%d')
-        is_consolidated = data.get('is_consolidated', False)
         
         match = re.match(r'(\d+)/(\d+)', str(installments_str))
         
-        if match and not is_consolidated:
+        if match:
             current_inst = int(match.group(1))
             total_inst = int(match.group(2))
             
@@ -340,61 +403,37 @@ def expenses(expense_id=None):
                 "card_id": ObjectId(data.get('card_id')) if data.get('card_id') else None,
                 "installments": data.get('installments'),
                 "observation": data.get('observation'),
-                "is_consolidated": is_consolidated,
+                "is_consolidated": False,
                 "created_at": datetime.utcnow()
             }
             res = db.expenses.insert_one(new_expense)
             new_expense['_id'] = res.inserted_id
-            return jsonify([serialize_doc(new_expense)])
+            return jsonify([serialize_doc(new_expense, 'micro')])
             
-    # --- GET (CORRIGIDO) ---
-    # Usando $and para evitar sobrescrita de condições
-    match_conditions = [{"user_id": ObjectId(current_user.id)}]
+    # GET (Micro)
+    query = {"user_id": ObjectId(current_user.id)}
     
-    # 1. Filtro de Tipo (View Type)
-    view_type = request.args.get('view_type')
-    if view_type == 'consolidated':
-        match_conditions.append({
-            "$or": [
-                {"is_consolidated": True},
-                {"payment_method": {"$ne": "credito"}}
-            ]
-        })
-    # Se view_type não for consolidated, traz tudo (Micro view)
-
-    # 2. Filtro de Busca
+    # Filtro de Busca
     search_term = request.args.get('search')
     if search_term:
         regex = re.compile(search_term, re.IGNORECASE)
-        match_conditions.append({
-            "$or": [
-                {"description": regex},
-                {"establishment": regex},
-                {"category": regex},
-                {"buyer": regex}
-            ]
-        })
+        query["$or"] = [{"description": regex}, {"establishment": regex}, {"category": regex}, {"buyer": regex}]
     
-    # 3. Filtro de Data
+    # Filtro de Data
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date or end_date:
-        date_query = {}
-        if start_date: date_query["$gte"] = start_date
-        if end_date: date_query["$lte"] = end_date
-        match_conditions.append({"date": date_query})
-
-    # Monta a query final
-    query = {"$and": match_conditions}
+        query["date"] = {}
+        if start_date: query["date"]["$gte"] = start_date
+        if end_date: query["date"]["$lte"] = end_date
 
     expenses = list(db.expenses.find(query).sort("date", -1))
-    
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})
             if card: expense['card_name'] = card['name']
             
-    return jsonify([serialize_doc(e) for e in expenses])
+    return jsonify([serialize_doc(e, 'micro') for e in expenses])
 
 # --- INVESTIMENTOS ---
 @app.route('/api/investments', methods=['GET', 'POST'])

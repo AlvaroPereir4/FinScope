@@ -568,14 +568,14 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         } else if (type === 'consolidated') {
             // Macro Expense
+            url = '/api/macro-expenses'; // NEW ENDPOINT
             data = {
                 description: document.getElementById('cons-desc').value,
                 amount: parseFloat(document.getElementById('cons-amount').value),
                 date: document.getElementById('cons-date').value,
                 category: document.getElementById('cons-category').value,
-                card_id: document.getElementById('cons-card').value || null, // Add Card ID
-                is_consolidated: true,
-                payment_method: document.getElementById('cons-method').value // Get selected method
+                card_id: document.getElementById('cons-card').value || null, 
+                payment_method: document.getElementById('cons-method').value 
             };
             
             if (isEditing && editingType === 'macro') {
@@ -640,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isEditing = true;
         editingId = expense._id;
         
-        if (expense.is_consolidated) {
+        if (expense.source === 'macro') {
             // Macro Edit
             editingType = 'macro';
             if(consolidatedForm) {
@@ -701,10 +701,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.deleteExpense = async function(id) {
+    window.deleteExpense = async function(id, source) {
         if(!confirm('Tem certeza que deseja excluir este gasto?')) return;
+        
+        let url = `/api/expenses/${id}`;
+        if(source === 'macro') url = `/api/macro-expenses/${id}`;
+        
         try {
-            const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+            const res = await fetch(url, { method: 'DELETE' });
             if(res.ok) {
                 if(window.location.pathname === '/detailed') loadDetailedData();
                 else loadData();
@@ -818,7 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadData(isSearch = false) {
         try {
             // Dashboard loads Consolidated + Non-Credit Detailed
-            let expenseUrl = '/api/expenses?view_type=consolidated';
+            let macroUrl = '/api/macro-expenses'; // NEW
             
             // Apply dashboard filters
             let startDate = '';
@@ -841,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if(currentFilter !== 'all') {
-                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
+                macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
             
             let incomeUrl = '/api/incomes';
@@ -849,31 +853,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
             }
 
-            const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
+            const [incomesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch(incomeUrl), 
-                fetch(expenseUrl),
+                fetch(macroUrl),
                 fetch('/api/investments/history'),
                 fetch('/api/investments'),
                 fetch('/api/balance')
             ]);
 
             const incomes = await incomesRes.json();
-            const expenses = await expensesRes.json();
+            const macroExpenses = await macroRes.json();
             const investmentsHistory = await investmentsRes.json();
             const currentInvestments = await allInvestmentsRes.json();
             const balanceData = await balanceRes.json();
             
+            // Combine Micro and Macro for Dashboard
+            const allExpenses = [...macroExpenses];
+            
             cachedIncomes = incomes;
-            cachedExpenses = expenses;
+            cachedExpenses = allExpenses;
             cachedInvestments = investmentsHistory;
 
-            updateDashboard(incomes, expenses, currentInvestments, balanceData);
-            updateChart(incomes, expenses, investmentsHistory);
+            updateDashboard(incomes, allExpenses, currentInvestments, balanceData);
+            updateChart(incomes, allExpenses, investmentsHistory);
             
             // Pagination Logic
             allTableData = [
                 ...incomes.map(i => ({...i, type: 'income'})),
-                ...expenses.map(e => ({...e, type: 'expense'}))
+                ...allExpenses.map(e => ({...e, type: 'expense'}))
             ];
             allTableData.sort((a, b) => new Date(b.date) - new Date(a.date));
             
@@ -985,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let details = '';
             if (!isIncome) {
-                if(item.is_consolidated) {
+                if(item.source === 'macro') {
                     details = `<span class="badge" style="background:#e74c3c;color:#fff">Conta</span>`;
                     if(item.card_name) details += ` <span class="badge card">💳 ${item.card_name}</span>`;
                 }
@@ -995,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const itemStr = encodeURIComponent(JSON.stringify(item));
             const actions = !isIncome ? `
                 <button class="btn-icon-small edit" onclick="editExpense('${itemStr}')">✎</button>
-                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}')">🗑</button>
+                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}', '${item.source}')">🗑</button>
             ` : '';
 
             row.innerHTML = `
