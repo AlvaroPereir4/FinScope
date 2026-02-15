@@ -562,6 +562,41 @@ tr:last-child td {
 .btn-icon-small.edit { color: var(--accent-color); }
 .btn-icon-small.delete { color: var(--danger-color); }
 
+/* Pagination */
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 35px;
+    height: 35px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.page-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+.page-btn.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
 /* Badges */
 .badge {
     padding: 0.25rem 0.5rem;

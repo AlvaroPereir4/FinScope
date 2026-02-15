@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const expenseForm = document.getElementById('expense-form'); // Micro Form
     const consolidatedForm = document.getElementById('consolidated-form'); // Macro Form
     const historyTableBody = document.querySelector('#history-table tbody');
+    const paginationControls = document.getElementById('pagination-controls');
     
     // Micro Form Elements
     const cardSelect = document.getElementById('exp-card');
@@ -16,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Macro Form Elements
     const consCategorySelect = document.getElementById('cons-category');
+    const consCardSelect = document.getElementById('cons-card');
+    const btnSaveConsolidated = consolidatedForm ? consolidatedForm.querySelector('button[type="submit"]') : null;
 
     // Dashboard Filters
     const filterBtns = document.querySelectorAll('.filter-btn');
@@ -69,8 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBuyers = [];
     let isEditing = false;
     let editingId = null;
-    let currentFilter = '30'; 
+    let editingType = null; // 'micro' or 'macro'
+    let currentFilter = 'all'; // Default All
     let selectedYear = new Date().getFullYear().toString();
+    
+    // Pagination State
+    let currentPage = 1;
+    const itemsPerPage = 30;
+    let allTableData = []; // Store all data for pagination
     
     // Chart State
     let chartGranularity = 'month'; 
@@ -82,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cachedIncomes = [];
     let cachedExpenses = [];
     let cachedInvestments = [];
-    let cachedDetailedExpenses = []; // For detailed page chart
+    let cachedDetailedExpenses = []; 
     
     // Default dates
     const today = new Date().toISOString().split('T')[0];
@@ -99,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(document.getElementById('financeChart')) {
         loadYears();
+        loadCards(); // Load cards for macro form
     }
     
     if(document.getElementById('cards-container')) {
@@ -521,17 +531,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/cards');
             const cards = await res.json();
             
-            if(cardSelect) {
-                const currentVal = cardSelect.value;
-                cardSelect.innerHTML = '<option value="">Selecione...</option>';
-                cards.forEach(card => {
-                    const option = document.createElement('option');
-                    option.value = card._id;
-                    option.textContent = card.name;
-                    cardSelect.appendChild(option);
-                });
-                if(currentVal) cardSelect.value = currentVal;
-            }
+            const selects = [cardSelect, consCardSelect];
+            selects.forEach(sel => {
+                if(sel) {
+                    const currentVal = sel.value;
+                    // Keep "Nenhum" option for consCardSelect
+                    const defaultOpt = sel.id === 'cons-card' ? '<option value="">Nenhum</option>' : '<option value="">Selecione...</option>';
+                    sel.innerHTML = defaultOpt;
+                    
+                    cards.forEach(card => {
+                        const option = document.createElement('option');
+                        option.value = card._id;
+                        option.textContent = card.name;
+                        sel.appendChild(option);
+                    });
+                    if(currentVal) sel.value = currentVal;
+                }
+            });
         } catch (err) { console.error(err); }
     }
 
@@ -557,9 +573,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: parseFloat(document.getElementById('cons-amount').value),
                 date: document.getElementById('cons-date').value,
                 category: document.getElementById('cons-category').value,
+                card_id: document.getElementById('cons-card').value || null, // Add Card ID
                 is_consolidated: true,
-                payment_method: 'debito' // Default for consolidated
+                payment_method: document.getElementById('cons-method').value // Get selected method
             };
+            
+            if (isEditing && editingType === 'macro') {
+                url += `/${editingId}`;
+                method = 'PUT';
+            }
         } else {
             // Micro Expense
             data = {
@@ -576,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 is_consolidated: false
             };
 
-            if (isEditing) {
+            if (isEditing && editingType === 'micro') {
                 url += `/${editingId}`;
                 method = 'PUT';
             }
@@ -618,33 +640,64 @@ document.addEventListener('DOMContentLoaded', () => {
         isEditing = true;
         editingId = expense._id;
         
-        document.getElementById('exp-desc').value = expense.description;
-        document.getElementById('exp-amount').value = expense.amount;
-        document.getElementById('exp-date').value = expense.date;
-        document.getElementById('exp-establishment').value = expense.establishment || '';
-        document.getElementById('exp-buyer').value = expense.buyer || '';
-        document.getElementById('exp-category').value = expense.category || '';
-        document.getElementById('exp-method').value = expense.payment_method || 'debito';
-        document.getElementById('exp-obs').value = expense.observation || '';
-        
-        if (expense.payment_method === 'credito') {
-            cardGroup.style.display = 'grid';
-            document.getElementById('exp-card').value = expense.card_id || '';
-            document.getElementById('exp-installments').value = expense.installments || '';
+        if (expense.is_consolidated) {
+            // Macro Edit
+            editingType = 'macro';
+            if(consolidatedForm) {
+                document.getElementById('cons-desc').value = expense.description;
+                document.getElementById('cons-amount').value = expense.amount;
+                document.getElementById('cons-date').value = expense.date;
+                document.getElementById('cons-category').value = expense.category || '';
+                document.getElementById('cons-card').value = expense.card_id || '';
+                document.getElementById('cons-method').value = expense.payment_method || 'debito';
+                
+                if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Atualizar Conta';
+                
+                // Open section
+                const section = consolidatedForm.closest('.input-section');
+                if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
+                consolidatedForm.scrollIntoView({ behavior: 'smooth' });
+                
+                // Add cancel button logic for macro
+                let cancelBtn = document.getElementById('btn-cancel-macro');
+                if(!cancelBtn) {
+                    cancelBtn = document.createElement('button');
+                    cancelBtn.id = 'btn-cancel-macro';
+                    cancelBtn.type = 'button';
+                    cancelBtn.className = 'btn-secondary';
+                    cancelBtn.textContent = 'Cancelar';
+                    cancelBtn.style.marginTop = '1rem';
+                    cancelBtn.onclick = cancelEdit;
+                    consolidatedForm.appendChild(cancelBtn);
+                }
+                cancelBtn.style.display = 'block';
+            }
         } else {
-            cardGroup.style.display = 'none';
-        }
+            // Micro Edit
+            editingType = 'micro';
+            document.getElementById('exp-desc').value = expense.description;
+            document.getElementById('exp-amount').value = expense.amount;
+            document.getElementById('exp-date').value = expense.date;
+            document.getElementById('exp-establishment').value = expense.establishment || '';
+            document.getElementById('exp-buyer').value = expense.buyer || '';
+            document.getElementById('exp-category').value = expense.category || '';
+            document.getElementById('exp-method').value = expense.payment_method || 'debito';
+            document.getElementById('exp-obs').value = expense.observation || '';
+            
+            if (expense.payment_method === 'credito') {
+                cardGroup.style.display = 'grid';
+                document.getElementById('exp-card').value = expense.card_id || '';
+                document.getElementById('exp-installments').value = expense.installments || '';
+            } else {
+                cardGroup.style.display = 'none';
+            }
 
-        btnSaveExpense.textContent = 'Atualizar Gasto';
-        btnCancelEdit.style.display = 'inline-block';
-        
-        // Scroll to form
-        expenseForm.scrollIntoView({ behavior: 'smooth' });
-        
-        // Open the collapsible if closed
-        const section = expenseForm.closest('.input-section');
-        if(section.classList.contains('collapsed')) {
-            section.classList.remove('collapsed');
+            btnSaveExpense.textContent = 'Atualizar Gasto';
+            btnCancelEdit.style.display = 'inline-block';
+            
+            expenseForm.scrollIntoView({ behavior: 'smooth' });
+            const section = expenseForm.closest('.input-section');
+            if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
         }
     };
 
@@ -662,11 +715,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function cancelEdit() {
         isEditing = false;
         editingId = null;
-        expenseForm.reset();
-        document.getElementById('exp-date').value = today;
-        btnSaveExpense.textContent = 'Registrar Gasto';
-        btnCancelEdit.style.display = 'none';
-        toggleCardSelect();
+        editingType = null;
+        
+        if(expenseForm) {
+            expenseForm.reset();
+            document.getElementById('exp-date').value = today;
+            btnSaveExpense.textContent = 'Registrar Gasto';
+            btnCancelEdit.style.display = 'none';
+            toggleCardSelect();
+        }
+        
+        if(consolidatedForm) {
+            consolidatedForm.reset();
+            document.getElementById('cons-date').value = today;
+            if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Registrar Saída';
+            const cancelBtn = document.getElementById('btn-cancel-macro');
+            if(cancelBtn) cancelBtn.style.display = 'none';
+        }
     }
 
     // --- Cards Page Logic ---
@@ -774,9 +839,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 startDate = `${selectedYear}-01-01`;
                 endDate = `${selectedYear}-12-31`;
             }
-            expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
             
-            const incomeUrl = `/api/incomes?start_date=${startDate}&end_date=${endDate}`;
+            if(currentFilter !== 'all') {
+                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
+            }
+            
+            let incomeUrl = '/api/incomes';
+            if(currentFilter !== 'all') {
+                incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
+            }
 
             const [incomesRes, expensesRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
                 fetch(incomeUrl), 
@@ -798,7 +869,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateDashboard(incomes, expenses, currentInvestments, balanceData);
             updateChart(incomes, expenses, investmentsHistory);
-            updateTable(incomes, expenses);
+            
+            // Pagination Logic
+            allTableData = [
+                ...incomes.map(i => ({...i, type: 'income'})),
+                ...expenses.map(e => ({...e, type: 'expense'}))
+            ];
+            allTableData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            currentPage = 1;
+            renderPagination();
+            renderTablePage();
 
         } catch (error) {
             console.error('Error loading data:', error);
@@ -829,7 +910,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     details = `<span class="badge method">${item.payment_method || '-'}</span>`;
                 }
-                if(item.is_consolidated) details += ` <span class="badge" style="background:#e74c3c;color:#fff">Macro</span>`;
+                if(item.is_consolidated) {
+                    details += ` <span class="badge" style="background:#e74c3c;color:#fff">Macro</span>`;
+                    if(item.card_name) details += ` <span class="badge card">💳 ${item.card_name}</span>`;
+                }
 
                 const itemStr = encodeURIComponent(JSON.stringify(item));
                 const actions = `
@@ -869,24 +953,50 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('net-worth').textContent = formatCurrency(netWorth);
     }
 
-    function updateTable(incomes, expenses) {
+    function renderPagination() {
+        if(!paginationControls) return;
+        paginationControls.innerHTML = '';
+        
+        const totalPages = Math.ceil(allTableData.length / itemsPerPage);
+        if(totalPages <= 1) return;
+
+        for(let i = 1; i <= totalPages; i++) {
+            const btn = document.createElement('button');
+            btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+            btn.textContent = i;
+            btn.onclick = () => {
+                currentPage = i;
+                renderPagination();
+                renderTablePage();
+            };
+            paginationControls.appendChild(btn);
+        }
+    }
+
+    function renderTablePage() {
         historyTableBody.innerHTML = '';
-        let allItems = [
-            ...incomes.map(i => ({...i, type: 'income'})),
-            ...expenses.map(e => ({...e, type: 'expense'}))
-        ];
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageItems = allTableData.slice(start, end);
 
-        allItems.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        allItems.slice(0, 10).forEach(item => {
+        pageItems.forEach(item => {
             const row = document.createElement('tr');
             const isIncome = item.type === 'income';
             
             let details = '';
             if (!isIncome) {
-                if(item.is_consolidated) details = `<span class="badge" style="background:#e74c3c;color:#fff">Conta</span>`;
+                if(item.is_consolidated) {
+                    details = `<span class="badge" style="background:#e74c3c;color:#fff">Conta</span>`;
+                    if(item.card_name) details += ` <span class="badge card">💳 ${item.card_name}</span>`;
+                }
                 else details = `<span class="badge method">${item.payment_method || '-'}</span>`;
             }
+
+            const itemStr = encodeURIComponent(JSON.stringify(item));
+            const actions = !isIncome ? `
+                <button class="btn-icon-small edit" onclick="editExpense('${itemStr}')">✎</button>
+                <button class="btn-icon-small delete" onclick="deleteExpense('${item._id}')">🗑</button>
+            ` : '';
 
             row.innerHTML = `
                 <td>${formatDate(item.date)}</td>
@@ -894,10 +1004,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${isIncome ? 'Renda' : 'Saída'}
                 </td>
                 <td>${item.description}</td>
+                <td>${details}</td>
                 <td class="${isIncome ? 'amount-positive' : 'amount-negative'}">
                     ${isIncome ? '+' : '-'} ${formatCurrency(item.amount)}
                 </td>
-                <td>-</td>
+                <td>${actions}</td>
             `;
             historyTableBody.appendChild(row);
         });

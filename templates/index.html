@@ -31,7 +31,8 @@
             <!-- Filtros do Dashboard -->
             <div class="dashboard-controls">
                 <div class="filter-group">
-                    <button class="filter-btn active" data-period="30">30 Dias</button>
+                    <button class="filter-btn active" data-period="all">Todos</button>
+                    <button class="filter-btn" data-period="30">30 Dias</button>
                     <button class="filter-btn" data-period="180">6 Meses</button>
                     <button class="filter-btn" data-period="year">Ano</button>
                 </div>
@@ -140,9 +141,27 @@
                                     <input type="date" id="cons-date" required>
                                 </div>
                             </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Categoria</label>
+                                    <select id="cons-category">
+                                        <!-- JS populates -->
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Método</label>
+                                    <select id="cons-method">
+                                        <option value="debito">Débito (Conta Corrente)</option>
+                                        <option value="pix">PIX</option>
+                                        <option value="credito">Crédito</option>
+                                        <option value="dinheiro">Dinheiro</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="form-group">
-                                <label>Categoria</label>
-                                <select id="cons-category">
+                                <label>Vincular Cartão (Opcional)</label>
+                                <select id="cons-card">
+                                    <option value="">Nenhum</option>
                                     <!-- JS populates -->
                                 </select>
                             </div>
@@ -164,6 +183,7 @@
                                 <th>Data</th>
                                 <th>Tipo</th>
                                 <th>Descrição</th>
+                                <th>Detalhes</th>
                                 <th>Valor</th>
                                 <th>Ações</th>
                             </tr>
@@ -172,6 +192,10 @@
                             <!-- JS will populate -->
                         </tbody>
                     </table>
+                </div>
+                <!-- Paginação -->
+                <div class="pagination-controls" id="pagination-controls">
+                    <!-- JS populates -->
                 </div>
             </section>
         </main>

@@ -146,20 +146,18 @@ def get_years():
 @app.route('/api/balance', methods=['GET'])
 @login_required
 def get_total_balance():
-    # Saldo = Total Rendas - (Gastos Consolidados + Gastos Detalhados NÃO Crédito)
-    
     # 1. Total Rendas
     pipeline_inc = [{"$match": {"user_id": ObjectId(current_user.id)}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
     res_inc = list(db.incomes.aggregate(pipeline_inc))
     total_inc = res_inc[0]['total'] if res_inc else 0
     
-    # 2. Total Gastos (Lógica Híbrida)
+    # 2. Total Gastos (Macro + Micro não crédito)
     pipeline_exp = [
         {"$match": {
             "user_id": ObjectId(current_user.id),
             "$or": [
-                {"is_consolidated": True}, # Contas Macro (Faturas, Luz, etc)
-                {"payment_method": {"$ne": "credito"}} # Gastos Micro que saem da conta (Débito, Pix)
+                {"is_consolidated": True},
+                {"payment_method": {"$ne": "credito"}}
             ]
         }},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
@@ -284,7 +282,6 @@ def expenses(expense_id=None):
     if request.method == 'POST':
         data = request.json
         
-        # Lógica de Parcelamento (Apenas para Gastos Detalhados/Micro)
         installments_str = data.get('installments')
         base_date = datetime.strptime(data['date'], '%Y-%m-%d')
         is_consolidated = data.get('is_consolidated', False)
@@ -350,39 +347,53 @@ def expenses(expense_id=None):
             new_expense['_id'] = res.inserted_id
             return jsonify([serialize_doc(new_expense)])
             
-    query = {"user_id": ObjectId(current_user.id)}
+    # --- GET (CORRIGIDO) ---
+    # Usando $and para evitar sobrescrita de condições
+    match_conditions = [{"user_id": ObjectId(current_user.id)}]
     
-    # Filtro de Tipo (Consolidado vs Detalhado)
+    # 1. Filtro de Tipo (View Type)
     view_type = request.args.get('view_type')
     if view_type == 'consolidated':
-        # Dashboard: Mostra Consolidados + Detalhados que NÃO são Crédito
-        query["$or"] = [
-            {"is_consolidated": True},
-            {"payment_method": {"$ne": "credito"}}
-        ]
-    elif view_type == 'detailed':
-        # Página Detalhada: Mostra tudo (para conferência) ou só os não consolidados?
-        # Geralmente detalhado mostra tudo, ou só os micro gastos.
-        # Vamos mostrar tudo, mas talvez o front filtre.
-        pass 
-    
+        match_conditions.append({
+            "$or": [
+                {"is_consolidated": True},
+                {"payment_method": {"$ne": "credito"}}
+            ]
+        })
+    # Se view_type não for consolidated, traz tudo (Micro view)
+
+    # 2. Filtro de Busca
     search_term = request.args.get('search')
     if search_term:
         regex = re.compile(search_term, re.IGNORECASE)
-        query["$or"] = [{"description": regex}, {"establishment": regex}, {"category": regex}, {"buyer": regex}]
+        match_conditions.append({
+            "$or": [
+                {"description": regex},
+                {"establishment": regex},
+                {"category": regex},
+                {"buyer": regex}
+            ]
+        })
     
+    # 3. Filtro de Data
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date or end_date:
-        query["date"] = {}
-        if start_date: query["date"]["$gte"] = start_date
-        if end_date: query["date"]["$lte"] = end_date
+        date_query = {}
+        if start_date: date_query["$gte"] = start_date
+        if end_date: date_query["$lte"] = end_date
+        match_conditions.append({"date": date_query})
+
+    # Monta a query final
+    query = {"$and": match_conditions}
 
     expenses = list(db.expenses.find(query).sort("date", -1))
+    
     for expense in expenses:
         if expense.get('card_id'):
             card = db.credit_cards.find_one({"_id": expense['card_id']})
             if card: expense['card_name'] = card['name']
+            
     return jsonify([serialize_doc(e) for e in expenses])
 
 # --- INVESTIMENTOS ---
