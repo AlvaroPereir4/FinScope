@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const zoomContainer = document.getElementById('zoom-container');
     const chartZoom = document.getElementById('chart-zoom');
     const zoomLabel = document.getElementById('zoom-label');
-    const viewModeSelect = document.getElementById('chart-view-mode'); // View Mode Select
+    const viewModeSelect = document.getElementById('chart-view-mode'); 
     
     // Chart Controls (Detailed)
     const detChartBtns = document.querySelectorAll('.det-chart-btn');
@@ -79,14 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBuyers = [];
     let isEditing = false;
     let editingId = null;
-    let editingType = null; // 'micro', 'macro', 'income'
-    let currentFilter = 'all'; // Default All
+    let editingType = null; 
+    let currentFilter = 'all'; 
     let selectedYear = new Date().getFullYear().toString();
     
     // Pagination State
     let currentPage = 1;
     const itemsPerPage = 30;
-    let allTableData = []; // Store all data for pagination
+    let allTableData = []; 
     
     // Chart State
     let chartGranularity = 'month'; 
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(document.getElementById('financeChart')) {
         loadYears();
-        loadCards(); // Load cards for macro form
+        loadCards(); 
     }
     
     if(document.getElementById('cards-container')) {
@@ -993,7 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const balanceData = await balanceRes.json();
             
             // Combine Micro and Macro for Dashboard
-            const allExpenses = [...expenses, ...macroExpenses];
+            const allExpenses = [...macroExpenses];
             
             cachedIncomes = incomes;
             cachedExpenses = allExpenses;
@@ -1092,6 +1092,20 @@ document.addEventListener('DOMContentLoaded', () => {
         paginationControls.innerHTML = '';
         
         const totalPages = Math.ceil(allTableData.length / itemsPerPage);
+        
+        // Add summary text
+        const summary = document.createElement('div');
+        summary.style.width = '100%';
+        summary.style.textAlign = 'center';
+        summary.style.marginBottom = '0.5rem';
+        summary.style.fontSize = '0.9rem';
+        summary.style.color = 'var(--text-secondary)';
+        
+        const start = (currentPage - 1) * itemsPerPage + 1;
+        const end = Math.min(currentPage * itemsPerPage, allTableData.length);
+        summary.textContent = `Mostrando ${start}-${end} de ${allTableData.length} registros`;
+        paginationControls.appendChild(summary);
+
         if(totalPages <= 1) return;
 
         for(let i = 1; i <= totalPages; i++) {
