@@ -71,6 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const walletTable = document.querySelector('#wallet-table tbody');
     const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
 
+    // Card Form Element
+    const cardForm = document.getElementById('card-form');
+
     // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
 
@@ -322,6 +325,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if(res.ok) { document.getElementById('wallet-modal').style.display = 'none'; loadWallets(); }
             } catch(err) { console.error(err); }
+        });
+    }
+
+    // Card Form Listener
+    if(cardForm) {
+        cardForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('card-name').value,
+                holder_name: document.getElementById('card-holder').value,
+                limit_amount: document.getElementById('card-limit').value,
+                closing_day: document.getElementById('card-closing').value,
+                due_day: document.getElementById('card-due').value
+            };
+
+            try {
+                const res = await fetch('/api/cards', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    cardForm.reset();
+                    loadCardsPage();
+                    alert('Cartão adicionado com sucesso!');
+                } else {
+                    alert('Erro ao adicionar cartão');
+                }
+            } catch (err) { console.error(err); }
         });
     }
 
