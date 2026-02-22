@@ -199,13 +199,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // View Mode Listener (Fixed)
+    // View Mode Listener
     if(viewModeSelect) {
         viewModeSelect.addEventListener('change', () => {
-            // Force update with current cached data
-            if(cachedIncomes.length || cachedExpenses.length) {
-                updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
-            }
+            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
         });
     }
     
@@ -1289,12 +1286,23 @@ document.addEventListener('DOMContentLoaded', () => {
             let colorIndex = 0;
             allCategories.forEach(cat => {
                 // Check if category has any value > 0 in the VISIBLE range
-                const totalVal = sortedKeys.reduce((sum, k) => sum + dataMap[k][cat], 0);
-                if (totalVal > 0) {
+                // AND check if category has started (not just zeros from beginning)
+                
+                let hasStarted = false;
+                const dataPoints = sortedKeys.map(k => {
+                    const val = dataMap[k][cat] || 0;
+                    if (val > 0) hasStarted = true;
+                    
+                    if (!hasStarted) return null; // Don't draw line before first value
+                    return val;
+                });
+
+                // Only add dataset if it has at least one non-null value
+                if (dataPoints.some(v => v !== null && v > 0)) {
                     const color = colors[colorIndex % colors.length];
                     datasets.push({
                         label: cat,
-                        data: sortedKeys.map(k => dataMap[k][cat]),
+                        data: dataPoints,
                         borderColor: color,
                         backgroundColor: color + '1A', // 10% opacity
                         tension: 0.4,
