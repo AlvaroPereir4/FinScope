@@ -1270,8 +1270,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 borderColor: '#2ecc71', 
                 backgroundColor: 'rgba(46, 204, 113, 0.05)',
                 tension: 0.4,
-                fill: true,
-                borderDash: [5, 5] // Dashed line for income to differentiate
+                fill: true
+                // REMOVED borderDash
             });
 
             // 2. Generate colors for categories
