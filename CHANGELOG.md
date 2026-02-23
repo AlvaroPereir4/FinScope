@@ -1,6 +1,7 @@
 # Changelog
 
 ## [0.0.1] - 2026-02-22
+  - Feature: Readme and changelog added.
   - Feature: User login, registration, and session management using Flask-Login.
   - Feature: Overview of total income, expenses, balance, and net worth.
   - Feature: Income management (Add/Edit/Delete).
