@@ -71,6 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const walletTable = document.querySelector('#wallet-table tbody');
     const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
 
+    // Card Form Element
+    const cardForm = document.getElementById('card-form');
+
     // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
 
@@ -322,6 +325,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
                 if(res.ok) { document.getElementById('wallet-modal').style.display = 'none'; loadWallets(); }
             } catch(err) { console.error(err); }
+        });
+    }
+
+    // Card Form Listener
+    if(cardForm) {
+        cardForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('card-name').value,
+                holder_name: document.getElementById('card-holder').value,
+                limit_amount: document.getElementById('card-limit').value,
+                closing_day: document.getElementById('card-closing').value,
+                due_day: document.getElementById('card-due').value
+            };
+
+            try {
+                const res = await fetch('/api/cards', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    cardForm.reset();
+                    loadCardsPage();
+                    alert('Cartão adicionado com sucesso!');
+                } else {
+                    alert('Erro ao adicionar cartão');
+                }
+            } catch (err) { console.error(err); }
         });
     }
 
@@ -1168,26 +1200,52 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = document.getElementById('financeChart').getContext('2d');
         const dataMap = {};
         
+        const viewMode = document.getElementById('chart-view-mode').value; // Get view mode
+
         const getKey = (dateStr) => {
             if (chartGranularity === 'day') return dateStr; 
             if (chartGranularity === 'year') return dateStr.substring(0, 4); 
             return dateStr.substring(0, 7); 
         };
 
-        [...incomes, ...expenses].forEach(item => {
-            const key = getKey(item.date);
-            if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-            if (incomes.includes(item)) dataMap[key].income += item.amount;
-            else dataMap[key].expense += item.amount;
-        });
-
-        investments.forEach(inv => {
-            if(inv.type === 'contribution') {
-                const key = getKey(inv.date);
+        if (viewMode === 'general') {
+            // --- GENERAL MODE (Income vs Expense vs Investment) ---
+            [...incomes, ...expenses].forEach(item => {
+                const key = getKey(item.date);
                 if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                dataMap[key].investment += inv.amount;
-            }
-        });
+                if (incomes.includes(item)) dataMap[key].income += item.amount;
+                else dataMap[key].expense += item.amount;
+            });
+
+            investments.forEach(inv => {
+                if(inv.type === 'contribution') {
+                    const key = getKey(inv.date);
+                    if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
+                    dataMap[key].investment += inv.amount;
+                }
+            });
+        } else {
+            // --- CATEGORY MODE (Income vs Category A vs Category B...) ---
+            // 1. Identify all unique categories present in the data
+            const allCategories = new Set();
+            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
+            
+            // 2. Initialize dataMap with dynamic keys
+            [...incomes, ...expenses].forEach(item => {
+                const key = getKey(item.date);
+                if (!dataMap[key]) {
+                    dataMap[key] = { income: 0 };
+                    allCategories.forEach(cat => dataMap[key][cat] = 0);
+                }
+                
+                if (incomes.includes(item)) {
+                    dataMap[key].income += item.amount;
+                } else {
+                    const cat = item.category || 'Outros';
+                    dataMap[key][cat] += item.amount;
+                }
+            });
+        }
 
         let sortedKeys = Object.keys(dataMap).sort();
         
@@ -1205,38 +1263,95 @@ document.addEventListener('DOMContentLoaded', () => {
             return `${m}/${y}`;
         });
 
+        // --- DATASETS GENERATION ---
+        let datasets = [];
+
+        if (viewMode === 'general') {
+            datasets = [
+                { 
+                    label: 'Rendas', 
+                    data: sortedKeys.map(k => dataMap[k].income), 
+                    borderColor: '#2ecc71', 
+                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                    tension: 0.4, 
+                    fill: true
+                },
+                { 
+                    label: 'Saídas', 
+                    data: sortedKeys.map(k => dataMap[k].expense), 
+                    borderColor: '#e74c3c', 
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                { 
+                    label: 'Investido', 
+                    data: sortedKeys.map(k => dataMap[k].investment), 
+                    borderColor: '#3498db', 
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ];
+        } else {
+            // Category Mode Datasets
+            // 1. Income (Always present)
+            datasets.push({
+                label: 'Rendas',
+                data: sortedKeys.map(k => dataMap[k].income),
+                borderColor: '#2ecc71', 
+                backgroundColor: 'rgba(46, 204, 113, 0.05)',
+                tension: 0.4,
+                fill: true
+                // REMOVED borderDash
+            });
+
+            // 2. Generate colors for categories
+            const colors = [
+                '#e74c3c', '#e67e22', '#f1c40f', '#9b59b6', '#3498db', 
+                '#1abc9c', '#34495e', '#7f8c8d', '#c0392b', '#d35400'
+            ];
+            
+            const allCategories = new Set();
+            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
+            
+            let colorIndex = 0;
+            allCategories.forEach(cat => {
+                // Check if category has any value > 0 in the VISIBLE range
+                // AND check if category has started (not just zeros from beginning)
+                
+                let hasStarted = false;
+                const dataPoints = sortedKeys.map(k => {
+                    const val = dataMap[k][cat] || 0;
+                    if (val > 0) hasStarted = true;
+                    
+                    if (!hasStarted) return null; // Don't draw line before first value
+                    return val;
+                });
+
+                // Only add dataset if it has at least one non-null value
+                if (dataPoints.some(v => v !== null && v > 0)) {
+                    const color = colors[colorIndex % colors.length];
+                    datasets.push({
+                        label: cat,
+                        data: dataPoints,
+                        borderColor: color,
+                        backgroundColor: color + '1A', // 10% opacity
+                        tension: 0.4,
+                        fill: false // Don't fill categories to avoid mess
+                    });
+                    colorIndex++;
+                }
+            });
+        }
+
         if (financeChart) financeChart.destroy();
         
         financeChart = new Chart(ctx, {
             type: 'line', 
             data: {
                 labels: labels,
-                datasets: [
-                    { 
-                        label: 'Rendas', 
-                        data: sortedKeys.map(k => dataMap[k].income), 
-                        borderColor: '#2ecc71', 
-                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                        tension: 0.4, 
-                        fill: true
-                    },
-                    { 
-                        label: 'Saídas', 
-                        data: sortedKeys.map(k => dataMap[k].expense), 
-                        borderColor: '#e74c3c', 
-                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    },
-                    { 
-                        label: 'Investido', 
-                        data: sortedKeys.map(k => dataMap[k].investment), 
-                        borderColor: '#3498db', 
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }
-                ]
+                datasets: datasets
             },
             options: {
                 responsive: true, 
