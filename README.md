@@ -55,7 +55,6 @@ Before you begin, ensure you have met the following requirements:
     Create a `.env` file in the root directory and add your configuration:
 
     ```env
-    SECRET_KEY=your_super_secret_key_here
     MONGO_URI=mongodb://localhost:27017/finscope
     ```
     *(If using MongoDB Atlas, replace the URI with your connection string).*
