@@ -16,6 +16,12 @@ The project aims to solve the fragmentation of financial data by consolidating "
 *   **Wallets:** Manage actual bank account balances.
 *   **Authentication:** Secure login and registration system.
 
+## Documentation & Roadmap
+
+For detailed specifications, references, ideas, and future improvements, please refer to documentation on Notion:
+
+[**FinScope Documentation on Notion**](https://www.notion.so/FinScope-2f30166bb9f68093b059e9fc28216280?source=copy_link)
+
 ## Prerequisites
 
 Before you begin, ensure you have met the following requirements:
@@ -71,6 +77,6 @@ Access the application in your browser at: `http://127.0.0.1:5000`
 *   `static/`: CSS styles and JavaScript logic.
 *   `static/js/script.js`: Handles frontend logic, API calls, and Chart.js rendering.
 
-## License
+## Feedback & Contributing
 
-This project is licensed under the MIT License.
+Welcome community feedback! If you have any comments, suggestions, or want to report a bug, please feel free to open an issue in this repository.
