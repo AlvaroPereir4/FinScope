@@ -1147,6 +1147,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateChart(chartData) {
         // Lógica de renderização, sem processamento de dados!
         const ctx = document.getElementById('financeChart').getContext('2d');
+        const fontSans = "'Inter', sans-serif";
+        const fontMono = "'Fira Code', monospace";
 
         if (financeChart) financeChart.destroy();
         
@@ -1154,7 +1156,14 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'line', 
             data: {
                 labels: chartData.labels,
-                datasets: chartData.datasets
+                datasets: chartData.datasets.map(ds => ({
+                    ...ds,
+                    borderWidth: 1.5, // Linha fina
+                    pointRadius: 0,   // Sem bolinhas (minimalista)
+                    pointHoverRadius: 4,
+                    tension: 0.2,     // Curva mais "robótica"
+                    fill: true
+                }))
             },
             options: {
                 responsive: true, 
@@ -1164,8 +1173,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     intersect: false,
                 },
                 plugins: { 
-                    legend: { labels: { color: '#e6e1de' } },
+                    legend: { 
+                        labels: { 
+                            color: '#e6e1de',
+                            font: { family: fontSans, size: 12, weight: 500 },
+                            boxWidth: 10,
+                            usePointStyle: true
+                        } 
+                    },
                     tooltip: {
+                        backgroundColor: 'rgba(26, 24, 23, 0.9)', // card-bg
+                        titleFont: { family: fontSans, size: 13 },
+                        bodyFont: { family: fontMono, size: 12 },
+                        borderColor: '#2a2827',
+                        borderWidth: 1,
+                        cornerRadius: 2,
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -1181,8 +1203,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
-                    x: { grid: { display: false }, ticks: { color: '#8f8681' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: '#2a2827', borderDash: [2, 4], drawBorder: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontMono, size: 10 } } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontSans, size: 11 } } 
+                    }
                 }
             }
         });
@@ -1190,6 +1219,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function updateDetailedChart(expenses) {
         const ctx = document.getElementById('detailedChart').getContext('2d');
+        const fontSans = "'Inter', sans-serif";
+        const fontMono = "'Fira Code', monospace";
         const dataMap = {};
         
         const getKey = (dateStr) => {
@@ -1237,16 +1268,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         data: sortedKeys.map(k => dataMap[k].credit), 
                         borderColor: '#9b59b6', 
                         backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                        tension: 0.4, 
-                        fill: true
+                        tension: 0.2, 
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
                     },
                     { 
                         label: 'Débito/Outros', 
                         data: sortedKeys.map(k => dataMap[k].debit), 
                         borderColor: '#e67e22', 
                         backgroundColor: 'rgba(230, 126, 34, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        tension: 0.2,
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
                     }
                 ]
             },
@@ -1258,8 +1295,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     intersect: false,
                 },
                 plugins: { 
-                    legend: { labels: { color: '#e6e1de' } },
+                    legend: { 
+                        labels: { 
+                            color: '#e6e1de',
+                            font: { family: fontSans, size: 12, weight: 500 },
+                            boxWidth: 10,
+                            usePointStyle: true
+                        } 
+                    },
                     tooltip: {
+                        backgroundColor: 'rgba(26, 24, 23, 0.9)',
+                        titleFont: { family: fontSans, size: 13 },
+                        bodyFont: { family: fontMono, size: 12 },
+                        borderColor: '#2a2827',
+                        borderWidth: 1,
+                        cornerRadius: 2,
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -1275,8 +1325,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
-                    x: { grid: { display: false }, ticks: { color: '#8f8681' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: '#2a2827', borderDash: [2, 4], drawBorder: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontMono, size: 10 } } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontSans, size: 11 } } 
+                    }
                 }
             }
         });
