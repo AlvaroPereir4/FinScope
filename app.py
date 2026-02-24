@@ -33,7 +33,8 @@ def load_user(user_id):
     try:
         user_data = db.users.find_one({"_id": ObjectId(user_id)})
         if user_data: return User(user_data)
-    except: pass
+    except Exception as e:
+        print(f"Error loading user {user_id}: {e}")
     return None
 
 def serialize_doc(doc, source=None):
@@ -163,6 +164,157 @@ def get_total_balance():
     res = list(db.wallets.aggregate(pipeline))
     total_balance = res[0]['total'] if res else 0
     return jsonify({"balance": total_balance})
+
+@app.route('/api/transactions', methods=['GET'])
+@login_required
+def get_transactions():
+    page = int(request.args.get('page', 1))
+    items_per_page = int(request.args.get('limit', 30))
+    
+    user_id = ObjectId(current_user.id)
+
+    # Usando Aggregation Framework para unir e paginar
+    pipeline = [
+        # Unir as coleções
+        {"$unionWith": {"coll": "expenses", "pipeline": [{"$addFields": {"type": "expense", "source": "micro"}}]}},
+        {"$unionWith": {"coll": "macro_expenses", "pipeline": [{"$addFields": {"type": "expense", "source": "macro"}}]}},
+        
+        # Filtrar pelo usuário atual
+        {"$match": {"user_id": user_id}},
+        
+        # Ordenar por data (mais recente primeiro)
+        {"$sort": {"date": -1}},
+        
+        # Faceta para contar o total e paginar
+        {"$facet": {
+            "metadata": [{"$count": "total"}],
+            "data": [{"$skip": (page - 1) * items_per_page}, {"$limit": items_per_page}]
+        }}
+    ]
+
+    # A coleção inicial da pipeline pode ser qualquer uma, aqui usamos 'incomes'
+    incomes_pipeline_base = [{"$addFields": {"type": "income", "source": "income"}}]
+    result = list(db.incomes.aggregate(incomes_pipeline_base + pipeline))
+
+    total_items = result[0]['metadata'][0]['total'] if result and result[0]['metadata'] else 0
+    transactions = result[0]['data'] if result and result[0]['data'] else []
+
+    # Serializar os documentos
+    serialized_transactions = [serialize_doc(t) for t in transactions]
+
+    return jsonify({
+        "items": serialized_transactions,
+        "total_items": total_items,
+        "current_page": page,
+        "total_pages": (total_items + items_per_page - 1) // items_per_page
+    })
+
+@app.route('/api/dashboard', methods=['GET'])
+@login_required
+def get_dashboard_data():
+    # 1. Obter filtros da query string
+    period = request.args.get('period', 'all')
+    year = request.args.get('year', str(datetime.now().year))
+    granularity = request.args.get('granularity', 'month') # 'day', 'month', 'year'
+
+    # 2. Montar filtro de data
+    date_filter = {}
+    if period != 'all':
+        end_date = datetime.now()
+        if period == '30':
+            start_date = end_date - timedelta(days=30)
+        elif period == '180':
+            start_date = end_date - relativedelta(months=6)
+        elif period == 'year':
+            start_date = datetime(int(year), 1, 1)
+            end_date = datetime(int(year), 12, 31)
+        
+        date_filter = {"date": {"$gte": start_date.strftime('%Y-%m-%d'), "$lte": end_date.strftime('%Y-%m-%d')}}
+
+    # 3. Calcular totais para o Summary
+    user_id_filter = {"user_id": ObjectId(current_user.id)}
+    
+    total_income = sum(d['amount'] for d in db.incomes.find({**user_id_filter, **date_filter}))
+    total_expense_micro = sum(d['amount'] for d in db.expenses.find({**user_id_filter, **date_filter}))
+    total_expense_macro = sum(d['amount'] for d in db.macro_expenses.find({**user_id_filter, **date_filter}))
+    total_expense = total_expense_micro + total_expense_macro
+
+    balance_res = list(db.wallets.aggregate([{"$match": user_id_filter}, {"$group": {"_id": None, "total": {"$sum": "$balance"}}}]))
+    balance = balance_res[0]['total'] if balance_res else 0
+
+    invested_res = list(db.investments.aggregate([{"$match": user_id_filter}, {"$group": {"_id": None, "total": {"$sum": "$current_amount"}}}]))
+    total_invested = invested_res[0]['total'] if invested_res else 0
+
+    summary = {
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": balance,
+        "total_invested": total_invested,
+        "net_worth": balance + total_invested
+    }
+
+    # 4. Preparar dados para o Gráfico (agregação no MongoDB)
+    if granularity == 'day':
+        group_id = {"$dateToString": {"format": "%Y-%m-%d", "date": {"$toDate": "$date"}}}
+        sort_field = "_id"
+    elif granularity == 'year':
+        group_id = {"$substr": ["$date", 0, 4]}
+        sort_field = "_id"
+    else: # month
+        group_id = {"$substr": ["$date", 0, 7]}
+        sort_field = "_id"
+
+    def aggregate_by_granularity(collection, amount_field='amount', extra_filter=None):
+        match_filter = {**user_id_filter, **date_filter}
+        if extra_filter:
+            match_filter.update(extra_filter)
+            
+        pipeline = [
+            {"$match": match_filter},
+            {"$group": {"_id": group_id, "total": {"$sum": f"${amount_field}"}}},
+            {"$sort": {sort_field: 1}}
+        ]
+        return {item['_id']: item['total'] for item in collection.aggregate(pipeline)}
+
+    income_data = aggregate_by_granularity(db.incomes)
+    expense_micro_data = aggregate_by_granularity(db.expenses)
+    expense_macro_data = aggregate_by_granularity(db.macro_expenses)
+    investment_data = aggregate_by_granularity(db.investment_entries, extra_filter={"type": "contribution"})
+
+    # Unificar chaves de data e montar o dataMap
+    all_keys = sorted(list(set(income_data.keys()) | set(expense_micro_data.keys()) | set(expense_macro_data.keys()) | set(investment_data.keys())))
+    
+    labels = []
+    income_values = []
+    expense_values = []
+    investment_values = []
+
+    for key in all_keys:
+        if granularity == 'day':
+            labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
+        elif granularity == 'month':
+            labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
+        else:
+            labels.append(key)
+        
+        income_values.append(income_data.get(key, 0))
+        total_exp = expense_micro_data.get(key, 0) + expense_macro_data.get(key, 0)
+        expense_values.append(total_exp)
+        investment_values.append(investment_data.get(key, 0))
+
+    chart_data = {
+        "labels": labels,
+        "datasets": [
+            {"label": "Rendas", "data": income_values, "borderColor": "#2ecc71", "backgroundColor": "rgba(46, 204, 113, 0.1)", "tension": 0.4, "fill": True},
+            {"label": "Saídas", "data": expense_values, "borderColor": "#e74c3c", "backgroundColor": "rgba(231, 76, 60, 0.1)", "tension": 0.4, "fill": True},
+            {"label": "Investido", "data": investment_values, "borderColor": "#3498db", "backgroundColor": "rgba(52, 152, 219, 0.1)", "tension": 0.4, "fill": True}
+        ]
+    }
+
+    return jsonify({
+        "summary": summary,
+        "chart_data": chart_data
+    })
 
 # --- CARTEIRA (WALLETS) ---
 @app.route('/api/wallets', methods=['GET', 'POST'])

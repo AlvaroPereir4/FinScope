@@ -98,9 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let detChartDays = 30;
     
     // Data Cache
-    let cachedIncomes = [];
-    let cachedExpenses = [];
-    let cachedInvestments = [];
     let cachedDetailedExpenses = []; 
     
     // Default dates
@@ -190,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chartGranularity = btn.dataset.granularity;
             if(chartGranularity === 'day') zoomContainer.style.display = 'flex';
             else zoomContainer.style.display = 'none';
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            loadData(); // Recarrega os dados com a nova granularidade
         });
     });
 
@@ -198,14 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
         chartZoom.addEventListener('input', () => {
             chartDays = parseInt(chartZoom.value);
             zoomLabel.textContent = `${chartDays} Dias`;
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            loadData(); // Recarrega os dados com o novo zoom
         });
     }
 
     // View Mode Listener
     if(viewModeSelect) {
         viewModeSelect.addEventListener('change', () => {
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            alert("A visualização por categoria agora precisa ser implementada no backend. Este é um bom próximo passo!");
+            // loadData(); // No futuro, passaria o viewMode para a API
         });
     }
     
@@ -973,80 +971,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Shared Logic ---
 
     async function loadData(isSearch = false) {
+        // NOVA LÓGICA: Chamada única para o backend
         try {
-            // Dashboard loads Consolidated + Non-Credit Detailed
-            let expenseUrl = '/api/expenses?view_type=consolidated';
-            let macroUrl = '/api/macro-expenses'; // NEW
-            
-            // Apply dashboard filters
-            let startDate = '';
-            let endDate = '';
-            const now = new Date();
-            
-            if (currentFilter === '30') {
-                const past = new Date();
-                past.setDate(now.getDate() - 30);
-                startDate = past.toISOString().split('T')[0];
-                endDate = now.toISOString().split('T')[0];
-            } else if (currentFilter === '180') {
-                const past = new Date();
-                past.setMonth(now.getMonth() - 6);
-                startDate = past.toISOString().split('T')[0];
-                endDate = now.toISOString().split('T')[0];
-            } else if (currentFilter === 'year') {
-                startDate = `${selectedYear}-01-01`;
-                endDate = `${selectedYear}-12-31`;
-            }
-            
-            if(currentFilter !== 'all') {
-                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
-                macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
-            }
-            
-            let incomeUrl = '/api/incomes';
-            if(currentFilter !== 'all') {
-                incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
-            }
+            const params = new URLSearchParams({
+                period: currentFilter,
+                year: selectedYear,
+                granularity: chartGranularity
+            });
 
-            const [incomesRes, expensesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
-                fetch(incomeUrl), 
-                fetch(expenseUrl),
-                fetch(macroUrl),
-                fetch('/api/investments/history'),
-                fetch('/api/investments'),
-                fetch('/api/balance')
-            ]);
+            const res = await fetch(`/api/dashboard?${params.toString()}`);
+            const data = await res.json();
 
-            const incomes = await incomesRes.json();
-            const expenses = await expensesRes.json();
-            const macroExpenses = await macroRes.json();
-            const investmentsHistory = await investmentsRes.json();
-            const currentInvestments = await allInvestmentsRes.json();
-            const balanceData = await balanceRes.json();
-            
-            // Combine Micro and Macro for Dashboard
-            const allExpenses = [...macroExpenses];
-            
-            cachedIncomes = incomes;
-            cachedExpenses = allExpenses;
-            cachedInvestments = investmentsHistory;
+            updateDashboard(data.summary);
+            updateChart(data.chart_data);
 
-            updateDashboard(incomes, allExpenses, currentInvestments, balanceData);
-            updateChart(incomes, allExpenses, investmentsHistory);
-            
-            // Pagination Logic
-            allTableData = [
-                ...incomes.map(i => ({...i, type: 'income', source: 'income'})), // Add source
-                ...allExpenses.map(e => ({...e, type: 'expense'}))
-            ];
-            allTableData.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            currentPage = 1;
-            renderPagination();
-            renderTablePage();
-
+            // Carrega a primeira página da tabela de transações via API
+            loadTransactionsPage(1);
         } catch (error) {
             console.error('Error loading data:', error);
+        }
+    }
+
+    async function loadTransactionsPage(page) {
+        try {
+            const res = await fetch(`/api/transactions?page=${page}`);
+            const pageData = await res.json();
+            
+            // allTableData agora armazena apenas a página atual
+            allTableData = pageData.items; 
+            currentPage = pageData.current_page;
+            
+            renderPagination(pageData); // Passa metadados do servidor
+            renderTablePage();
+        } catch (error) {
+            console.error('Error loading transactions:', error);
         }
     }
 
@@ -1098,32 +1056,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) { console.error(err); }
     }
 
-    function updateDashboard(incomes, expenses, currentInvestments, balanceData) {
-        const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
-        const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
-        
-        // CORREÇÃO AQUI: Usar o saldo da API (balanceData.balance)
-        const balance = balanceData.balance; 
-
-        document.getElementById('total-income').textContent = formatCurrency(totalIncome);
-        document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
+    function updateDashboard(summary) {
+        // Lógica de renderização, sem cálculos!
+        document.getElementById('total-income').textContent = formatCurrency(summary.total_income);
+        document.getElementById('total-expense').textContent = formatCurrency(summary.total_expense);
         
         const balanceEl = document.getElementById('balance');
-        balanceEl.textContent = formatCurrency(balance);
-        balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+        balanceEl.textContent = formatCurrency(summary.balance);
+        balanceEl.style.color = summary.balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
 
-        const totalInvested = currentInvestments.reduce((sum, inv) => sum + inv.current_amount, 0);
-        const netWorth = balance + totalInvested;
-
-        document.getElementById('total-invested-dash').textContent = formatCurrency(totalInvested);
-        document.getElementById('net-worth').textContent = formatCurrency(netWorth);
+        document.getElementById('total-invested-dash').textContent = formatCurrency(summary.total_invested);
+        document.getElementById('net-worth').textContent = formatCurrency(summary.net_worth);
     }
 
-    function renderPagination() {
+    function renderPagination(pageData) {
         if(!paginationControls) return;
         paginationControls.innerHTML = '';
         
-        const totalPages = Math.ceil(allTableData.length / itemsPerPage);
+        const { total_items, current_page, total_pages } = pageData || { total_items: 0, current_page: 1, total_pages: 1 };
         
         // Add summary text
         const summary = document.createElement('div');
@@ -1133,21 +1083,19 @@ document.addEventListener('DOMContentLoaded', () => {
         summary.style.fontSize = '0.9rem';
         summary.style.color = 'var(--text-secondary)';
         
-        const start = (currentPage - 1) * itemsPerPage + 1;
-        const end = Math.min(currentPage * itemsPerPage, allTableData.length);
-        summary.textContent = `Mostrando ${start}-${end} de ${allTableData.length} registros`;
+        const start = (current_page - 1) * itemsPerPage + 1;
+        const end = Math.min(current_page * itemsPerPage, total_items);
+        summary.textContent = `Mostrando ${start}-${end} de ${total_items} registros`;
         paginationControls.appendChild(summary);
 
-        if(totalPages <= 1) return;
+        if(total_pages <= 1) return;
 
-        for(let i = 1; i <= totalPages; i++) {
+        for(let i = 1; i <= total_pages; i++) {
             const btn = document.createElement('button');
-            btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+            btn.className = `page-btn ${i === current_page ? 'active' : ''}`;
             btn.textContent = i;
             btn.onclick = () => {
-                currentPage = i;
-                renderPagination();
-                renderTablePage();
+                loadTransactionsPage(i);
             };
             paginationControls.appendChild(btn);
         }
@@ -1155,9 +1103,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTablePage() {
         historyTableBody.innerHTML = '';
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        const pageItems = allTableData.slice(start, end);
+        
+        // Como allTableData agora só tem a página atual, não precisamos de slice
+        const pageItems = allTableData;
 
         pageItems.forEach(item => {
             const row = document.createElement('tr');
@@ -1196,162 +1144,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateChart(incomes, expenses, investments) {
+    function updateChart(chartData) {
+        // Lógica de renderização, sem processamento de dados!
         const ctx = document.getElementById('financeChart').getContext('2d');
-        const dataMap = {};
-        
-        const viewMode = document.getElementById('chart-view-mode').value; // Get view mode
-
-        const getKey = (dateStr) => {
-            if (chartGranularity === 'day') return dateStr; 
-            if (chartGranularity === 'year') return dateStr.substring(0, 4); 
-            return dateStr.substring(0, 7); 
-        };
-
-        if (viewMode === 'general') {
-            // --- GENERAL MODE (Income vs Expense vs Investment) ---
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                if (incomes.includes(item)) dataMap[key].income += item.amount;
-                else dataMap[key].expense += item.amount;
-            });
-
-            investments.forEach(inv => {
-                if(inv.type === 'contribution') {
-                    const key = getKey(inv.date);
-                    if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                    dataMap[key].investment += inv.amount;
-                }
-            });
-        } else {
-            // --- CATEGORY MODE (Income vs Category A vs Category B...) ---
-            // 1. Identify all unique categories present in the data
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            // 2. Initialize dataMap with dynamic keys
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) {
-                    dataMap[key] = { income: 0 };
-                    allCategories.forEach(cat => dataMap[key][cat] = 0);
-                }
-                
-                if (incomes.includes(item)) {
-                    dataMap[key].income += item.amount;
-                } else {
-                    const cat = item.category || 'Outros';
-                    dataMap[key][cat] += item.amount;
-                }
-            });
-        }
-
-        let sortedKeys = Object.keys(dataMap).sort();
-        
-        if (chartGranularity === 'day') {
-            sortedKeys = sortedKeys.slice(-chartDays);
-        }
-        
-        const labels = sortedKeys.map(k => {
-            if (chartGranularity === 'day') {
-                const [y, m, d] = k.split('-');
-                return `${d}/${m}`;
-            }
-            if (chartGranularity === 'year') return k;
-            const [y, m] = k.split('-');
-            return `${m}/${y}`;
-        });
-
-        // --- DATASETS GENERATION ---
-        let datasets = [];
-
-        if (viewMode === 'general') {
-            datasets = [
-                { 
-                    label: 'Rendas', 
-                    data: sortedKeys.map(k => dataMap[k].income), 
-                    borderColor: '#2ecc71', 
-                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                    tension: 0.4, 
-                    fill: true
-                },
-                { 
-                    label: 'Saídas', 
-                    data: sortedKeys.map(k => dataMap[k].expense), 
-                    borderColor: '#e74c3c', 
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                { 
-                    label: 'Investido', 
-                    data: sortedKeys.map(k => dataMap[k].investment), 
-                    borderColor: '#3498db', 
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }
-            ];
-        } else {
-            // Category Mode Datasets
-            // 1. Income (Always present)
-            datasets.push({
-                label: 'Rendas',
-                data: sortedKeys.map(k => dataMap[k].income),
-                borderColor: '#2ecc71', 
-                backgroundColor: 'rgba(46, 204, 113, 0.05)',
-                tension: 0.4,
-                fill: true
-                // REMOVED borderDash
-            });
-
-            // 2. Generate colors for categories
-            const colors = [
-                '#e74c3c', '#e67e22', '#f1c40f', '#9b59b6', '#3498db', 
-                '#1abc9c', '#34495e', '#7f8c8d', '#c0392b', '#d35400'
-            ];
-            
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            let colorIndex = 0;
-            allCategories.forEach(cat => {
-                // Check if category has any value > 0 in the VISIBLE range
-                // AND check if category has started (not just zeros from beginning)
-                
-                let hasStarted = false;
-                const dataPoints = sortedKeys.map(k => {
-                    const val = dataMap[k][cat] || 0;
-                    if (val > 0) hasStarted = true;
-                    
-                    if (!hasStarted) return null; // Don't draw line before first value
-                    return val;
-                });
-
-                // Only add dataset if it has at least one non-null value
-                if (dataPoints.some(v => v !== null && v > 0)) {
-                    const color = colors[colorIndex % colors.length];
-                    datasets.push({
-                        label: cat,
-                        data: dataPoints,
-                        borderColor: color,
-                        backgroundColor: color + '1A', // 10% opacity
-                        tension: 0.4,
-                        fill: false // Don't fill categories to avoid mess
-                    });
-                    colorIndex++;
-                }
-            });
-        }
 
         if (financeChart) financeChart.destroy();
         
         financeChart = new Chart(ctx, {
             type: 'line', 
             data: {
-                labels: labels,
-                datasets: datasets
+                labels: chartData.labels,
+                datasets: chartData.datasets
             },
             options: {
                 responsive: true, 
