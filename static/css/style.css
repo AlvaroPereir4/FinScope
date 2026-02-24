@@ -58,6 +58,40 @@ header {
     border-bottom: 1px solid var(--border-color);
 }
 
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.geist-triangle {
+    animation: float-triangle 4s ease-in-out infinite;
+}
+
+@keyframes float-triangle {
+    0%, 100% {
+        transform: translateY(0);
+        filter: drop-shadow(0 0 5px rgba(232, 124, 3, 0.3));
+    }
+    50% {
+        transform: translateY(-5px);
+        filter: drop-shadow(0 0 12px rgba(232, 124, 3, 0.6));
+    }
+}
+
+.triangle-path {
+    stroke: var(--white); /* Cor da luz percorrendo */
+    stroke-width: 1.5px;
+    stroke-dasharray: 30 100; /* 30px de linha, 100px de espaço */
+    stroke-linecap: round;    /* Pontas arredondadas */
+    stroke-linejoin: round;   /* Cantos arredondados */
+    animation: border-flow 3s linear infinite;
+}
+
+@keyframes border-flow {
+    to { stroke-dashoffset: -130; } /* Move o traçado ao longo do caminho */
+}
+
 .logo h1 {
     font-weight: 700;
     font-size: 1.8rem;
