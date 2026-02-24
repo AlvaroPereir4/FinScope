@@ -22,6 +22,13 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+CATEGORY_COLORS = [
+    "#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c", 
+    "#3498db", "#9b59b6", "#34495e", "#16a085", "#27ae60", 
+    "#2980b9", "#8e44ad", "#2c3e50", "#f39c12", "#d35400", 
+    "#c0392b", "#bdc3c7", "#7f8c8d"
+]
+
 class User(UserMixin):
     def __init__(self, user_doc):
         self.id = str(user_doc['_id'])
@@ -176,7 +183,7 @@ def get_transactions():
     # Usando Aggregation Framework para unir e paginar
     pipeline = [
         # Unir as coleções
-        {"$unionWith": {"coll": "expenses", "pipeline": [{"$addFields": {"type": "expense", "source": "micro"}}]}},
+        # Removido expenses (micro) para o dashboard principal mostrar apenas Macro + Rendas
         {"$unionWith": {"coll": "macro_expenses", "pipeline": [{"$addFields": {"type": "expense", "source": "macro"}}]}},
         
         # Filtrar pelo usuário atual
@@ -216,6 +223,7 @@ def get_dashboard_data():
     period = request.args.get('period', 'all')
     year = request.args.get('year', str(datetime.now().year))
     granularity = request.args.get('granularity', 'month') # 'day', 'month', 'year'
+    view_mode = request.args.get('view_mode', 'general')
 
     # 2. Montar filtro de data
     date_filter = {}
@@ -235,9 +243,8 @@ def get_dashboard_data():
     user_id_filter = {"user_id": ObjectId(current_user.id)}
     
     total_income = sum(d['amount'] for d in db.incomes.find({**user_id_filter, **date_filter}))
-    total_expense_micro = sum(d['amount'] for d in db.expenses.find({**user_id_filter, **date_filter}))
     total_expense_macro = sum(d['amount'] for d in db.macro_expenses.find({**user_id_filter, **date_filter}))
-    total_expense = total_expense_micro + total_expense_macro
+    total_expense = total_expense_macro # Apenas Macro no Dashboard Principal
 
     balance_res = list(db.wallets.aggregate([{"$match": user_id_filter}, {"$group": {"_id": None, "total": {"$sum": "$balance"}}}]))
     balance = balance_res[0]['total'] if balance_res else 0
@@ -264,52 +271,133 @@ def get_dashboard_data():
         group_id = {"$substr": ["$date", 0, 7]}
         sort_field = "_id"
 
-    def aggregate_by_granularity(collection, amount_field='amount', extra_filter=None):
-        match_filter = {**user_id_filter, **date_filter}
-        if extra_filter:
-            match_filter.update(extra_filter)
-            
-        pipeline = [
-            {"$match": match_filter},
-            {"$group": {"_id": group_id, "total": {"$sum": f"${amount_field}"}}},
-            {"$sort": {sort_field: 1}}
+    chart_data = {}
+
+    if view_mode == 'category':
+        # Agregação por Categoria (Macro + Rendas)
+        # 1. Macro Expenses
+        pipeline_macro = [
+            {"$match": {**user_id_filter, **date_filter}},
+            {"$project": {"amount": 1, "date": 1, "category": {"$ifNull": ["$category", "Outros"]}}},
+            {"$group": {
+                "_id": {"date": group_id, "category": "$category"},
+                "total": {"$sum": "$amount"}
+            }},
+            {"$sort": {"_id.date": 1}}
         ]
-        return {item['_id']: item['total'] for item in collection.aggregate(pipeline)}
-
-    income_data = aggregate_by_granularity(db.incomes)
-    expense_micro_data = aggregate_by_granularity(db.expenses)
-    expense_macro_data = aggregate_by_granularity(db.macro_expenses)
-    investment_data = aggregate_by_granularity(db.investment_entries, extra_filter={"type": "contribution"})
-
-    # Unificar chaves de data e montar o dataMap
-    all_keys = sorted(list(set(income_data.keys()) | set(expense_micro_data.keys()) | set(expense_macro_data.keys()) | set(investment_data.keys())))
-    
-    labels = []
-    income_values = []
-    expense_values = []
-    investment_values = []
-
-    for key in all_keys:
-        if granularity == 'day':
-            labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
-        elif granularity == 'month':
-            labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
-        else:
-            labels.append(key)
+        results_macro = list(db.macro_expenses.aggregate(pipeline_macro))
         
-        income_values.append(income_data.get(key, 0))
-        total_exp = expense_micro_data.get(key, 0) + expense_macro_data.get(key, 0)
-        expense_values.append(total_exp)
-        investment_values.append(investment_data.get(key, 0))
-
-    chart_data = {
-        "labels": labels,
-        "datasets": [
-            {"label": "Rendas", "data": income_values, "borderColor": "#2ecc71", "backgroundColor": "rgba(46, 204, 113, 0.1)", "tension": 0.4, "fill": True},
-            {"label": "Saídas", "data": expense_values, "borderColor": "#e74c3c", "backgroundColor": "rgba(231, 76, 60, 0.1)", "tension": 0.4, "fill": True},
-            {"label": "Investido", "data": investment_values, "borderColor": "#3498db", "backgroundColor": "rgba(52, 152, 219, 0.1)", "tension": 0.4, "fill": True}
+        # 2. Incomes (Adicionado como categoria "Renda")
+        pipeline_income = [
+            {"$match": {**user_id_filter, **date_filter}},
+            {"$project": {"amount": 1, "date": 1, "category": {"$literal": "Renda"}}},
+            {"$group": {
+                "_id": {"date": group_id, "category": "$category"},
+                "total": {"$sum": "$amount"}
+            }},
+            {"$sort": {"_id.date": 1}}
         ]
-    }
+        results_income = list(db.incomes.aggregate(pipeline_income))
+        
+        results = results_macro + results_income
+        
+        data_map = {}
+        all_categories = set()
+        all_dates = set()
+
+        for item in results:
+            date_key = item['_id']['date']
+            cat = item['_id']['category']
+            total = item['total']
+            
+            if date_key not in data_map: data_map[date_key] = {}
+            data_map[date_key][cat] = total
+            all_categories.add(cat)
+            all_dates.add(date_key)
+            
+        sorted_dates = sorted(list(all_dates))
+        sorted_categories = sorted(list(all_categories))
+        
+        labels = []
+        for key in sorted_dates:
+            if granularity == 'day':
+                labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
+            elif granularity == 'month':
+                labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
+            else:
+                labels.append(key)
+
+        datasets = []
+        for idx, cat in enumerate(sorted_categories):
+            data_points = []
+            for date_key in sorted_dates:
+                data_points.append(data_map.get(date_key, {}).get(cat, 0))
+            
+            if cat == 'Renda':
+                color = "#2ecc71"
+            else:
+                color = CATEGORY_COLORS[idx % len(CATEGORY_COLORS)]
+
+            datasets.append({
+                "label": cat,
+                "data": data_points,
+                "borderColor": color,
+                "backgroundColor": color + "1A",
+                "tension": 0.2,
+                "fill": False, # Categorias ficam melhor sem preenchimento para não poluir
+                "borderWidth": 2 if cat == 'Renda' else 1.5,
+                "pointRadius": 0,
+                "pointHoverRadius": 4
+            })
+            
+        chart_data = {"labels": labels, "datasets": datasets}
+
+    else:
+        # Visão Geral (Lógica Original)
+        def aggregate_by_granularity(collection, amount_field='amount', extra_filter=None):
+            match_filter = {**user_id_filter, **date_filter}
+            if extra_filter:
+                match_filter.update(extra_filter)
+                
+            pipeline = [
+                {"$match": match_filter},
+                {"$group": {"_id": group_id, "total": {"$sum": f"${amount_field}"}}},
+                {"$sort": {sort_field: 1}}
+            ]
+            return {item['_id']: item['total'] for item in collection.aggregate(pipeline)}
+
+        income_data = aggregate_by_granularity(db.incomes)
+        expense_macro_data = aggregate_by_granularity(db.macro_expenses)
+        investment_data = aggregate_by_granularity(db.investment_entries, extra_filter={"type": "contribution"})
+
+        all_keys = sorted(list(set(income_data.keys()) | set(expense_macro_data.keys()) | set(investment_data.keys())))
+        
+        labels = []
+        income_values = []
+        expense_values = []
+        investment_values = []
+
+        for key in all_keys:
+            if granularity == 'day':
+                labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
+            elif granularity == 'month':
+                labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
+            else:
+                labels.append(key)
+            
+            income_values.append(income_data.get(key, 0))
+            total_exp = expense_macro_data.get(key, 0)
+            expense_values.append(total_exp)
+            investment_values.append(investment_data.get(key, 0))
+
+        chart_data = {
+            "labels": labels,
+            "datasets": [
+                {"label": "Rendas", "data": income_values, "borderColor": "#2ecc71", "backgroundColor": "rgba(46, 204, 113, 0.1)", "tension": 0.4, "fill": True},
+                {"label": "Saídas", "data": expense_values, "borderColor": "#e74c3c", "backgroundColor": "rgba(231, 76, 60, 0.1)", "tension": 0.4, "fill": True},
+                {"label": "Investido", "data": investment_values, "borderColor": "#3498db", "backgroundColor": "rgba(52, 152, 219, 0.1)", "tension": 0.4, "fill": True}
+            ]
+        }
 
     return jsonify({
         "summary": summary,

@@ -202,8 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // View Mode Listener
     if(viewModeSelect) {
         viewModeSelect.addEventListener('change', () => {
-            alert("A visualização por categoria agora precisa ser implementada no backend. Este é um bom próximo passo!");
-            // loadData(); // No futuro, passaria o viewMode para a API
+            loadData();
         });
     }
     
@@ -976,7 +975,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams({
                 period: currentFilter,
                 year: selectedYear,
-                granularity: chartGranularity
+                granularity: chartGranularity,
+                view_mode: viewModeSelect ? viewModeSelect.value : 'general'
             });
 
             const res = await fetch(`/api/dashboard?${params.toString()}`);
@@ -1162,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pointRadius: 0,   // Sem bolinhas (minimalista)
                     pointHoverRadius: 4,
                     tension: 0.2,     // Curva mais "robótica"
-                    fill: true
+                    fill: ds.fill !== undefined ? ds.fill : true
                 }))
             },
             options: {
