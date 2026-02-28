@@ -45,16 +45,23 @@ body {
 .container {
     max-width: 98%; /* Ocupa quase toda a tela */
     margin: 0 auto;
-    padding: 2rem;
+    padding: 80px 2rem 2rem 2rem; /* Padding top aumentado para compensar o header fixo */
 }
 
 /* Header */
 header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px; /* Altura fixa e compacta */
+    background-color: rgba(12, 11, 11, 0.85); /* Fundo semi-transparente */
+    backdrop-filter: blur(12px); /* Efeito de vidro (Glassmorphism) */
+    z-index: 1000;
+    padding: 0 2rem; /* Espaçamento lateral */
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 3rem;
-    padding-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -66,16 +73,16 @@ header {
 
 .geist-triangle {
     animation: float-triangle 4s ease-in-out infinite;
+    width: 24px; /* Levemente menor */
+    height: 24px;
 }
 
 @keyframes float-triangle {
     0%, 100% {
         transform: translateY(0);
-        filter: drop-shadow(0 0 5px rgba(232, 124, 3, 0.3));
     }
     50% {
-        transform: translateY(-5px);
-        filter: drop-shadow(0 0 12px rgba(232, 124, 3, 0.6));
+        transform: translateY(-3px); /* Movimento mais sutil */
     }
 }
 
@@ -94,7 +101,7 @@ header {
 
 .logo h1 {
     font-weight: 700;
-    font-size: 1.8rem;
+    font-size: 1.4rem; /* Fonte menor para caber na barra compacta */
     color: var(--text-primary);
     letter-spacing: -0.03em;
 }
@@ -114,7 +121,7 @@ header {
     text-decoration: none;
     font-weight: 500;
     transition: color 0.2s;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     letter-spacing: -0.01em;
 }
 
@@ -137,16 +144,31 @@ header {
     color: var(--danger-color);
 }
 
+/* Ícone de Configurações Minimalista */
 .btn-icon {
     background: none;
     border: none;
-    font-size: 1.2rem;
     cursor: pointer;
-    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
 }
 
 .btn-icon:hover {
-    transform: rotate(45deg);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-icon svg {
+    stroke: var(--text-secondary);
+    transition: stroke 0.2s, transform 0.5s ease;
+}
+
+.btn-icon:hover svg {
+    stroke: var(--text-primary);
+    transform: rotate(90deg);
 }
 
 /* Dashboard Controls */
@@ -154,7 +176,8 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    margin-top: 1rem; /* Espaço extra após o header */
 }
 
 .filter-group {
