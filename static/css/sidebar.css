@@ -111,7 +111,6 @@
     background: rgba(255,255,255,0.02);
 }
 
-/* Utilitários de Texto e Layout (Substituindo Bootstrap) */
 .sb-d-flex { display: flex; }
 .sb-justify-between { justify-content: space-between; }
 .sb-align-center { align-items: center; }
@@ -123,7 +122,6 @@
 .sb-fw-bold { font-weight: 600; font-size: 0.95rem; }
 .sb-amount { font-family: var(--font-mono); font-weight: 600; }
 
-/* Spinner de Carregamento */
 .sb-spinner {
     width: 30px;
     height: 30px;
