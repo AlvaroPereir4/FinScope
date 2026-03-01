@@ -135,7 +135,6 @@
 }
 @keyframes sb-spin { to { transform: rotate(360deg); } }
 
-/* Estilos para o Modo de Edição na Sidebar */
 .sidebar-form-group {
     margin-bottom: 0.5rem;
 }

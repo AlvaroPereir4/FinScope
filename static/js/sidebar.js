@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Injeta o HTML da sidebar se não existir
     if (!document.getElementById("detailsSidebar")) {
         const sidebarHTML = `
             <div id="detailsSidebarOverlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -35,7 +34,6 @@ async function openSidebar(date, scope) {
     body.innerHTML = '<div class="sb-spinner"></div>';
 
     try {
-        // Chama a API atualizada com filtro de data e escopo
         const res = await fetch(`/api/transactions?date=${date}&scope=${scope}&limit=100`);
         const data = await res.json();
 
@@ -51,7 +49,6 @@ async function openSidebar(date, scope) {
             const sign = isExpense ? '-' : '+';
             const amount = parseFloat(item.amount).toFixed(2);
             
-            // Prepara o objeto para ser passado para a função de edição (escapando aspas)
             const itemStr = encodeURIComponent(JSON.stringify(item));
             
             html += `
@@ -84,10 +81,7 @@ function editSidebarItem(itemStr) {
     const item = JSON.parse(decodeURIComponent(itemStr));
     const container = document.getElementById(`sb-item-${item._id}`);
     
-    // Salva o HTML original caso cancele
     container.dataset.originalHtml = container.innerHTML;
-
-    // Define se mostra campo de categoria (Renda geralmente não tem categoria editável no seu app, mas vamos prevenir erros)
     const showCategory = item.type === 'expense';
 
     container.innerHTML = `
@@ -130,7 +124,6 @@ async function saveSidebarItem(id, type, source) {
     const catInput = document.getElementById(`edit-cat-${id}`);
     const category = catInput ? catInput.value : 'General';
 
-    // Determina a URL correta baseada no tipo e fonte
     let url = '';
     if (type === 'income') {
         url = `/api/incomes/${id}`;
@@ -140,16 +133,11 @@ async function saveSidebarItem(id, type, source) {
         url = `/api/expenses/${id}`;
     }
 
-    // Monta o payload. Nota: O backend espera campos específicos.
-    // Para simplificar a edição rápida, mantemos alguns campos originais como null ou padrão se não estiverem no form
-    // O ideal seria buscar o objeto completo antes, mas vamos enviar o que temos.
     const payload = {
         description: desc,
         amount: parseFloat(amount),
         date: date,
         category: category,
-        // Campos obrigatórios que o backend pode exigir, enviamos valores seguros ou vazios
-        // O backend do app.py usa .get() para a maioria, mas date/amount/desc são essenciais
     };
 
     try {
@@ -160,13 +148,11 @@ async function saveSidebarItem(id, type, source) {
         });
 
         if (res.ok) {
-            // Atualiza visualmente o item com os novos dados sem recarregar tudo
             const container = document.getElementById(`sb-item-${id}`);
             const isExpense = type === 'expense';
             const colorClass = isExpense ? 'sb-text-danger' : 'sb-text-success';
             const sign = isExpense ? '-' : '+';
             
-            // Reconstrói o objeto item para atualizar o botão de editar
             const newItem = { _id: id, type, source, description: desc, amount, date, category };
             const itemStr = encodeURIComponent(JSON.stringify(newItem));
 
@@ -182,8 +168,6 @@ async function saveSidebarItem(id, type, source) {
                     </div>
                 </div>
             `;
-            // Opcional: Recarregar o gráfico principal se quiser refletir a mudança imediatamente
-            // if (typeof loadData === 'function') loadData(); 
         } else {
             alert('Erro ao salvar edição.');
         }
@@ -193,21 +177,17 @@ async function saveSidebarItem(id, type, source) {
     }
 }
 
-// Função auxiliar para conectar ao Chart.js
 function handleChartClick(evt, activeElements, chart, scope, currentYear) {
     if (activeElements.length === 0) return;
     
     const index = activeElements[0].index;
-    const label = chart.data.labels[index]; // Ex: "27/10" (Dia) ou "10/2023" (Mês)
+    const label = chart.data.labels[index];
     
     let dateParam = label;
     
-    // Reconstrói a data para o formato YYYY-MM-DD ou YYYY-MM
     if (label.includes('/')) {
         const parts = label.split('/');
-        // Se for MM/YYYY (Mês)
         if (parts[1].length === 4) dateParam = `${parts[1]}-${parts[0]}`;
-        // Se for DD/MM (Dia), assume o ano atual ou passado por parametro
         else dateParam = `${currentYear}-${parts[1]}-${parts[0]}`;
     }
     
