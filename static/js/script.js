@@ -1,12 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Elements ---
     const incomeForm = document.getElementById('income-form');
-    const expenseForm = document.getElementById('expense-form'); // Micro Form
-    const consolidatedForm = document.getElementById('consolidated-form'); // Macro Form
+    const expenseForm = document.getElementById('expense-form');
+    const consolidatedForm = document.getElementById('consolidated-form');
     const historyTableBody = document.querySelector('#history-table tbody');
     const paginationControls = document.getElementById('pagination-controls');
     
-    // Micro Form Elements
     const cardSelect = document.getElementById('exp-card');
     const methodSelect = document.getElementById('exp-method');
     const cardGroup = document.getElementById('card-select-group');
@@ -15,33 +13,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
     const btnSaveExpense = document.getElementById('btn-save-expense');
     
-    // Macro Form Elements
     const consCategorySelect = document.getElementById('cons-category');
     const consCardSelect = document.getElementById('cons-card');
     const btnSaveConsolidated = consolidatedForm ? consolidatedForm.querySelector('button[type="submit"]') : null;
     const btnSaveIncome = incomeForm ? incomeForm.querySelector('button[type="submit"]') : null;
 
-    // Dashboard Filters
     const filterBtns = document.querySelectorAll('.filter-btn');
     const yearSelect = document.getElementById('dashboard-year');
     
-    // Chart Controls (Dashboard)
     const chartBtns = document.querySelectorAll('.chart-btn');
     const zoomContainer = document.getElementById('zoom-container');
     const chartZoom = document.getElementById('chart-zoom');
     const zoomLabel = document.getElementById('zoom-label');
     const viewModeSelect = document.getElementById('chart-view-mode'); 
     
-    // Chart Controls (Detailed)
     const detChartBtns = document.querySelectorAll('.det-chart-btn');
     const detZoomContainer = document.getElementById('det-zoom-container');
     const detChartZoom = document.getElementById('det-chart-zoom');
     const detZoomLabel = document.getElementById('det-zoom-label');
     
-    // Search (Micro Page)
     const searchTerm = document.getElementById('search-term');
 
-    // Settings Modal
     const btnSettings = document.getElementById('btn-settings');
     const settingsModal = document.getElementById('settings-modal');
     const closeModal = document.querySelector('.close-modal');
@@ -53,12 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAddBuyer = document.getElementById('btn-add-buyer');
     const btnSaveSettings = document.getElementById('btn-save-settings');
     
-    // Invoice Page Elements
     const invoiceSection = document.getElementById('invoice-section');
     const invoiceMonthInput = document.getElementById('invoice-month');
     const btnLoadInvoice = document.getElementById('btn-load-invoice');
     
-    // Investments & Goals Elements
     const investmentForm = document.getElementById('investment-form');
     const goalForm = document.getElementById('goal-form');
     const entryForm = document.getElementById('entry-form');
@@ -66,18 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
 
-    // Wallet Elements
     const walletForm = document.getElementById('wallet-form');
     const walletTable = document.querySelector('#wallet-table tbody');
     const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
 
-    // Card Form Element
     const cardForm = document.getElementById('card-form');
 
-    // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
 
-    // State
     let currentCategories = [];
     let currentBuyers = [];
     let isEditing = false;
@@ -86,21 +72,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFilter = 'all'; 
     let selectedYear = new Date().getFullYear().toString();
     
-    // Pagination State
     let currentPage = 1;
     const itemsPerPage = 30;
     let allTableData = []; 
     
-    // Chart State
     let chartGranularity = 'month'; 
     let chartDays = 30;
     let detChartGranularity = 'month';
     let detChartDays = 30;
     
-    // Data Cache
     let cachedDetailedExpenses = []; 
     
-    // Default dates
     const today = new Date().toISOString().split('T')[0];
     if(document.getElementById('inc-date')) document.getElementById('inc-date').value = today;
     if(document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
@@ -110,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let financeChart = null;
     let detailedChart = null;
 
-    // --- Initial Load ---
     loadSettings(); 
 
     if(document.getElementById('financeChart')) {
@@ -139,7 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadWallets();
     }
 
-    // --- Event Listeners ---
     
     collapsibles.forEach(header => {
         header.addEventListener('click', () => {
@@ -157,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(searchTerm) searchTerm.addEventListener('input', () => loadDetailedData(true));
 
-    // Dashboard Filter Events
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             filterBtns.forEach(b => b.classList.remove('active'));
@@ -179,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Dashboard Chart Controls
     chartBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             chartBtns.forEach(b => b.classList.remove('active'));
@@ -187,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chartGranularity = btn.dataset.granularity;
             if(chartGranularity === 'day') zoomContainer.style.display = 'flex';
             else zoomContainer.style.display = 'none';
-            loadData(); // Recarrega os dados com a nova granularidade
+            loadData();
         });
     });
 
@@ -195,18 +173,16 @@ document.addEventListener('DOMContentLoaded', () => {
         chartZoom.addEventListener('input', () => {
             chartDays = parseInt(chartZoom.value);
             zoomLabel.textContent = `${chartDays} Dias`;
-            loadData(); // Recarrega os dados com o novo zoom
+            loadData();
         });
     }
 
-    // View Mode Listener
     if(viewModeSelect) {
         viewModeSelect.addEventListener('change', () => {
             loadData();
         });
     }
     
-    // Detailed Chart Controls
     detChartBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             detChartBtns.forEach(b => b.classList.remove('active'));
@@ -226,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Settings Events
     if(btnSettings) {
         btnSettings.addEventListener('click', () => {
             settingsModal.style.display = 'flex';
@@ -244,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSaveSettings.addEventListener('click', saveSettings);
     }
 
-    // Invoice Events
     if(btnLoadInvoice) {
         btnLoadInvoice.addEventListener('click', () => {
             const cardId = invoiceSection.dataset.cardId;
@@ -252,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Investments & Goals Events
     if(investmentForm) {
         investmentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -325,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Card Form Listener
     if(cardForm) {
         cardForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -346,19 +318,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     cardForm.reset();
                     loadCardsPage();
-                    alert('Cartão adicionado com sucesso!');
+                    alert('Card added successfully!');
                 } else {
-                    alert('Erro ao adicionar cartão');
+                    alert('Error adding card');
                 }
             } catch (err) { console.error(err); }
         });
     }
 
-    // --- Functions ---
-
     function toggleCardSelect() {
         const method = methodSelect.value;
-        if (method === 'credito') {
+        if (method === 'credit') {
             cardGroup.style.display = 'grid';
         } else {
             cardGroup.style.display = 'none';
@@ -373,8 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
         searchEnd.value = '';
         loadData(false);
     }
-
-    // --- Settings Logic ---
 
     async function loadSettings() {
         try {
@@ -396,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(res.ok) {
                 settingsModal.style.display = 'none';
                 updateSelects();
-                alert('Configurações salvas!');
+                alert('Settings saved!');
             }
         } catch (err) { console.error(err); }
     }
@@ -456,8 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Wallet Logic ---
-
     async function loadWallets() {
         try {
             const res = await fetch('/api/wallets');
@@ -500,8 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetch(`/api/wallets/${id}`, { method: 'DELETE' });
         loadWallets();
     };
-
-    // --- Investments & Goals Logic ---
 
     async function loadInvestments() {
         try {
@@ -617,8 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGoals();
     };
 
-    // --- Data Logic (Dashboard) ---
-
     async function loadYears() {
         try {
             const res = await fetch('/api/years');
@@ -644,7 +606,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selects.forEach(sel => {
                 if(sel) {
                     const currentVal = sel.value;
-                    // Keep "Nenhum" option for consCardSelect
                     const defaultOpt = sel.id === 'cons-card' ? '<option value="">Nenhum</option>' : '<option value="">Selecione...</option>';
                     sel.innerHTML = defaultOpt;
                     
@@ -670,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let data = {};
 
         if (isIncome) {
-            url = '/api/incomes'; // Explicitly set URL for income
+            url = '/api/incomes';
             data = {
                 description: document.getElementById('inc-desc').value,
                 amount: parseFloat(document.getElementById('inc-amount').value),
@@ -682,8 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method = 'PUT';
             }
         } else if (type === 'consolidated') {
-            // Macro Expense
-            url = '/api/macro-expenses'; // NEW ENDPOINT
+            url = '/api/macro-expenses';
             data = {
                 description: document.getElementById('cons-desc').value,
                 amount: parseFloat(document.getElementById('cons-amount').value),
@@ -698,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 method = 'PUT';
             }
         } else {
-            // Micro Expense
             data = {
                 description: document.getElementById('exp-desc').value,
                 amount: parseFloat(document.getElementById('exp-amount').value),
@@ -740,14 +699,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(window.location.pathname === '/detailed') loadDetailedData();
                 else loadData(); 
             } else {
-                alert('Erro ao salvar dados');
+                alert('Error saving data');
             }
         } catch (error) {
             console.error('Error:', error);
         }
     }
-
-    // --- Edit Logic ---
 
     window.editExpense = function(expenseStr) {
         const item = JSON.parse(decodeURIComponent(expenseStr));
@@ -756,7 +713,6 @@ document.addEventListener('DOMContentLoaded', () => {
         editingId = item._id;
         
         if (item.type === 'income') {
-            // Income Edit
             editingType = 'income';
             if(incomeForm) {
                 document.getElementById('inc-desc').value = item.description;
@@ -769,7 +725,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
                 incomeForm.scrollIntoView({ behavior: 'smooth' });
                 
-                // Add cancel button
                 let cancelBtn = document.getElementById('btn-cancel-income');
                 if(!cancelBtn) {
                     cancelBtn = document.createElement('button');
@@ -784,7 +739,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelBtn.style.display = 'block';
             }
         } else if (item.is_consolidated || item.source === 'macro') {
-            // Macro Edit
             editingType = 'macro';
             if(consolidatedForm) {
                 document.getElementById('cons-desc').value = item.description;
@@ -792,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('cons-date').value = item.date;
                 document.getElementById('cons-category').value = item.category || '';
                 document.getElementById('cons-card').value = item.card_id || '';
-                document.getElementById('cons-method').value = item.payment_method || 'debito';
+                document.getElementById('cons-method').value = item.payment_method || 'debit';
                 
                 if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Atualizar Conta';
                 
@@ -814,7 +768,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelBtn.style.display = 'block';
             }
         } else {
-            // Micro Edit
             editingType = 'micro';
             document.getElementById('exp-desc').value = item.description;
             document.getElementById('exp-amount').value = item.amount;
@@ -822,10 +775,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('exp-establishment').value = item.establishment || '';
             document.getElementById('exp-buyer').value = item.buyer || '';
             document.getElementById('exp-category').value = item.category || '';
-            document.getElementById('exp-method').value = item.payment_method || 'debito';
+            document.getElementById('exp-method').value = item.payment_method || 'debit';
             document.getElementById('exp-obs').value = item.observation || '';
             
-            if (item.payment_method === 'credito') {
+            if (item.payment_method === 'credit') {
                 cardGroup.style.display = 'grid';
                 document.getElementById('exp-card').value = item.card_id || '';
                 document.getElementById('exp-installments').value = item.installments || '';
@@ -847,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let url = `/api/expenses/${id}`;
         if(source === 'macro') url = `/api/macro-expenses/${id}`;
-        else if(source === 'income') url = `/api/incomes/${id}`; // Need to implement DELETE for incomes
+        else if(source === 'income') url = `/api/incomes/${id}`;
         
         try {
             const res = await fetch(url, { method: 'DELETE' });
@@ -887,8 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if(cancelBtn) cancelBtn.style.display = 'none';
         }
     }
-
-    // --- Cards Page Logic ---
 
     async function loadCardsPage() {
         try {
@@ -940,7 +891,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('invoice-total').textContent = formatCurrency(data.total);
             document.getElementById('invoice-period').textContent = `Período: ${formatDate(data.period.start)} a ${formatDate(data.period.end)}`;
             
-            // Buyers Breakdown
             const buyersDiv = document.getElementById('buyers-breakdown');
             buyersDiv.innerHTML = '';
             for (const [buyer, amount] of Object.entries(data.buyers_summary)) {
@@ -949,7 +899,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 buyersDiv.appendChild(p);
             }
 
-            // Table
             const tbody = document.querySelector('#invoice-table tbody');
             tbody.innerHTML = '';
             data.expenses.forEach(exp => {
@@ -967,10 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) { console.error(err); }
     }
 
-    // --- Shared Logic ---
-
     async function loadData(isSearch = false) {
-        // NOVA LÓGICA: Chamada única para o backend
         try {
             const params = new URLSearchParams({
                 period: currentFilter,
@@ -985,7 +931,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDashboard(data.summary);
             updateChart(data.chart_data);
 
-            // Carrega a primeira página da tabela de transações via API
             loadTransactionsPage(1);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -997,11 +942,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch(`/api/transactions?page=${page}`);
             const pageData = await res.json();
             
-            // allTableData agora armazena apenas a página atual
             allTableData = pageData.items; 
             currentPage = pageData.current_page;
             
-            renderPagination(pageData); // Passa metadados do servidor
+            renderPagination(pageData);
             renderTablePage();
         } catch (error) {
             console.error('Error loading transactions:', error);
@@ -1010,7 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDetailedData(isSearch = false) {
         try {
-            let url = '/api/expenses?view_type=detailed'; // Load everything for detailed view
+            let url = '/api/expenses?view_type=detailed';
             if(isSearch && searchTerm.value) {
                 url += `&search=${searchTerm.value}`;
             }
@@ -1026,7 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = document.createElement('tr');
                 
                 let details = '';
-                if (item.payment_method === 'credito' && item.card_name) {
+                if (item.payment_method === 'credit' && item.card_name) {
                     details = `<span class="badge card">💳 ${item.card_name}</span>`;
                     if (item.installments) details += ` <span class="badge installments">${item.installments}x</span>`;
                 } else {
@@ -1057,7 +1001,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateDashboard(summary) {
-        // Lógica de renderização, sem cálculos!
         document.getElementById('total-income').textContent = formatCurrency(summary.total_income);
         document.getElementById('total-expense').textContent = formatCurrency(summary.total_expense);
         
@@ -1075,7 +1018,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const { total_items, current_page, total_pages } = pageData || { total_items: 0, current_page: 1, total_pages: 1 };
         
-        // Add summary text
         const summary = document.createElement('div');
         summary.style.width = '100%';
         summary.style.textAlign = 'center';
@@ -1104,7 +1046,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTablePage() {
         historyTableBody.innerHTML = '';
         
-        // Como allTableData agora só tem a página atual, não precisamos de slice
         const pageItems = allTableData;
 
         pageItems.forEach(item => {
@@ -1145,7 +1086,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateChart(chartData) {
-        // Lógica de renderização, sem processamento de dados!
         const ctx = document.getElementById('financeChart').getContext('2d');
         const fontSans = "'Inter', sans-serif";
         const fontMono = "'Fira Code', monospace";
@@ -1158,10 +1098,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 labels: chartData.labels,
                 datasets: chartData.datasets.map(ds => ({
                     ...ds,
-                    borderWidth: 1.5, // Linha fina
-                    pointRadius: 0,   // Sem bolinhas (minimalista)
+                    borderWidth: 1.5,
+                    pointRadius: 0,
                     pointHoverRadius: 4,
-                    tension: 0.2,     // Curva mais "robótica"
+                    tension: 0.2,
                     fill: ds.fill !== undefined ? ds.fill : true
                 }))
             },
@@ -1182,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         } 
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(26, 24, 23, 0.9)', // card-bg
+                        backgroundColor: 'rgba(26, 24, 23, 0.9)',
                         titleFont: { family: fontSans, size: 13 },
                         bodyFont: { family: fontMono, size: 12 },
                         borderColor: '#2a2827',
@@ -1233,7 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = getKey(item.date);
             if (!dataMap[key]) dataMap[key] = { credit: 0, debit: 0 };
             
-            if (item.payment_method === 'credito') {
+            if (item.payment_method === 'credit') {
                 dataMap[key].credit += item.amount;
             } else {
                 dataMap[key].debit += item.amount;

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FinScope{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg class="geist-triangle" width="24" height="24" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path class="triangle-path" d="M15 0L30 30H0L15 0Z" fill="url(#triangle-gradient)" stroke="none"/>
+                    <defs>
+                        <linearGradient id="triangle-gradient" x1="15" y1="0" x2="15" y2="30" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#e87c03"/>
+                            <stop offset="1" stop-color="#ff9838"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <h1>Fin<span>Scope</span></h1>
+            </div>
+            <div class="user-controls">
+                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('wallet_page') }}" class="nav-link">Minha Carteira</a>
+                <a href="{{ url_for('detailed_page') }}" class="nav-link">Gastos Detalhados</a>
+                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
+                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <span class="divider">|</span>
+                <button id="btn-settings" class="btn-icon" title="Configurações">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </button>
+                <span class="divider">|</span>
+                <span>Olá, {{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+            </div>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Configurações</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="settings-group">
+                    <h3>Categorias de Gastos</h3>
+                    <div class="tags-list" id="categories-list"></div>
+                    <div class="add-tag-form">
+                        <input type="text" id="new-category-input" placeholder="Nova categoria...">
+                        <button id="btn-add-category" class="btn-primary" style="width: auto;">+</button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Compradores</h3>
+                    <div class="tags-list" id="buyers-list"></div>
+                    <div class="add-tag-form">
+                        <input type="text" id="new-buyer-input" placeholder="Novo comprador...">
+                        <button id="btn-add-buyer" class="btn-primary" style="width: auto;">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-save-settings" class="btn-primary">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

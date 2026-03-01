@@ -1,26 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meus Cartões - FinScope</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <h1>Fin<span>Scope</span></h1>
-            </div>
-            <div class="user-controls">
-                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
-            </div>
-        </header>
+{% extends "base.html" %}
 
-        <main>
-            <!-- Seção de Cadastro de Cartão -->
+{% block title %}Meus Cartões - FinScope{% endblock %}
+
+{% block content %}
             <section class="input-section collapsed" id="new-card-section">
                 <div class="section-header" onclick="toggleNewCard()">
                     <h2>Adicionar Novo Cartão</h2>
@@ -55,12 +37,9 @@
                 </form>
             </section>
 
-            <!-- Lista de Cartões -->
             <section class="cards-grid" id="cards-container">
-                <!-- Cards will be injected here -->
             </section>
 
-            <!-- Detalhes da Fatura -->
             <section class="invoice-section" id="invoice-section" style="display: none;">
                 <div class="invoice-header">
                     <h2 id="invoice-card-name">Fatura Nubank</h2>
@@ -79,7 +58,6 @@
                     <div class="card">
                         <h3>Por Comprador</h3>
                         <div id="buyers-breakdown">
-                            <!-- JS populates -->
                         </div>
                     </div>
                 </div>
@@ -97,15 +75,13 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- JS populates -->
                         </tbody>
                     </table>
                 </div>
             </section>
-        </main>
-    </div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% block scripts %}
     <script>
         // Inline script for specific card page logic if needed,
         // but we will move most logic to script.js to keep it clean.
@@ -114,5 +90,4 @@
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
         }
     </script>
-</body>
-</html>
+{% endblock %}

@@ -1,30 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investimentos - FinScope</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <h1>Fin<span>Scope</span></h1>
-            </div>
-            <div class="user-controls">
-                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
-                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
-                <span class="divider">|</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
-            </div>
-        </header>
+{% extends "base.html" %}
 
-        <main>
-            <!-- Carteira de Investimentos -->
+{% block title %}Investimentos - FinScope{% endblock %}
+
+{% block content %}
             <section class="investments-section">
                 <div class="section-header">
                     <h2>Minha Carteira</h2>
@@ -43,13 +21,9 @@
                 </div>
 
                 <div class="investments-grid" id="investments-container">
-                    <!-- JS populates cards here -->
                 </div>
             </section>
-        </main>
-    </div>
 
-    <!-- Modal Novo Investimento -->
     <div id="investment-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -87,7 +61,6 @@
         </div>
     </div>
 
-    <!-- Modal Aporte/Rendimento -->
     <div id="entry-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -116,8 +89,9 @@
             </form>
         </div>
     </div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% block scripts %}
     <script>
         function openModal(id) {
             document.getElementById(id).style.display = 'flex';
@@ -139,5 +113,4 @@
             }
         }
     </script>
-</body>
-</html>
+{% endblock %}
