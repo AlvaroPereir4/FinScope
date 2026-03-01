@@ -1108,6 +1108,11 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true, 
                 maintainAspectRatio: false,
+                onClick: (e, activeElements, chart) => {
+                    if (typeof handleChartClick === 'function') {
+                        handleChartClick(e, activeElements, chart, 'macro', selectedYear);
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false,
@@ -1230,6 +1235,11 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true, 
                 maintainAspectRatio: false,
+                onClick: (e, activeElements, chart) => {
+                    if (typeof handleChartClick === 'function') {
+                        handleChartClick(e, activeElements, chart, 'micro', selectedYear);
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false,

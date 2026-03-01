@@ -171,12 +171,24 @@ def get_total_balance():
 def get_transactions():
     page = int(request.args.get('page', 1))
     items_per_page = int(request.args.get('limit', 30))
+    date_filter = request.args.get('date')
+    scope = request.args.get('scope', 'macro')
     
     user_id = ObjectId(current_user.id)
 
+    match_query = {"user_id": user_id}
+    if date_filter:
+        if len(date_filter) == 7:
+            match_query["date"] = {"$regex": f"^{date_filter}"}
+        else:
+            match_query["date"] = date_filter
+
+    expense_coll = "expenses" if scope == 'micro' else "macro_expenses"
+    source_label = "micro" if scope == 'micro' else "macro"
+
     pipeline = [
-        {"$unionWith": {"coll": "macro_expenses", "pipeline": [{"$addFields": {"type": "expense", "source": "macro"}}]}},
-        {"$match": {"user_id": user_id}},
+        {"$unionWith": {"coll": expense_coll, "pipeline": [{"$addFields": {"type": "expense", "source": source_label}}]}},
+        {"$match": match_query},
         {"$sort": {"date": -1}},
         {"$facet": {
             "metadata": [{"$count": "total"}],

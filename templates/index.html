@@ -3,6 +3,7 @@
 {% block title %}FinScope - Dashboard{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
             <div class="dashboard-controls">
                 <div class="filter-group">
                     <button class="filter-btn active" data-period="all">Todos</button>
@@ -166,4 +167,5 @@
                 <div class="pagination-controls" id="pagination-controls">
                 </div>
             </section>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 {% endblock %}

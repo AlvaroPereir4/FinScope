@@ -1,6 +1,7 @@
 # Changelog
 
 ## [0.0.2] - 2026-03-01
+  - Feature: Added function to click dashboard point and see details of transactions, and edits.
   - Feature: General adjustments to front-end.
   - Fix: Many refact to code structure and patterns.
 
