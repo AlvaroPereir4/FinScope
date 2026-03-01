@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.2] - 2026-03-01
+  - Feature: Added function to click dashboard point and see details of transactions, and edits.
+  - Feature: General adjustments to front-end.
+  - Fix: Many refact to code structure and patterns.
+
 ## [0.0.1] - 2026-02-22
   - Feature: Readme and changelog added.
   - Feature: User login, registration, and session management using Flask-Login.

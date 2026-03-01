@@ -1,12 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Elements ---
     const incomeForm = document.getElementById('income-form');
-    const expenseForm = document.getElementById('expense-form'); // Micro Form
-    const consolidatedForm = document.getElementById('consolidated-form'); // Macro Form
+    const expenseForm = document.getElementById('expense-form');
+    const consolidatedForm = document.getElementById('consolidated-form');
     const historyTableBody = document.querySelector('#history-table tbody');
     const paginationControls = document.getElementById('pagination-controls');
     
-    // Micro Form Elements
     const cardSelect = document.getElementById('exp-card');
     const methodSelect = document.getElementById('exp-method');
     const cardGroup = document.getElementById('card-select-group');
@@ -15,33 +13,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
     const btnSaveExpense = document.getElementById('btn-save-expense');
     
-    // Macro Form Elements
     const consCategorySelect = document.getElementById('cons-category');
     const consCardSelect = document.getElementById('cons-card');
     const btnSaveConsolidated = consolidatedForm ? consolidatedForm.querySelector('button[type="submit"]') : null;
     const btnSaveIncome = incomeForm ? incomeForm.querySelector('button[type="submit"]') : null;
 
-    // Dashboard Filters
     const filterBtns = document.querySelectorAll('.filter-btn');
     const yearSelect = document.getElementById('dashboard-year');
     
-    // Chart Controls (Dashboard)
     const chartBtns = document.querySelectorAll('.chart-btn');
     const zoomContainer = document.getElementById('zoom-container');
     const chartZoom = document.getElementById('chart-zoom');
     const zoomLabel = document.getElementById('zoom-label');
     const viewModeSelect = document.getElementById('chart-view-mode'); 
     
-    // Chart Controls (Detailed)
     const detChartBtns = document.querySelectorAll('.det-chart-btn');
     const detZoomContainer = document.getElementById('det-zoom-container');
     const detChartZoom = document.getElementById('det-chart-zoom');
     const detZoomLabel = document.getElementById('det-zoom-label');
     
-    // Search (Micro Page)
     const searchTerm = document.getElementById('search-term');
 
-    // Settings Modal
     const btnSettings = document.getElementById('btn-settings');
     const settingsModal = document.getElementById('settings-modal');
     const closeModal = document.querySelector('.close-modal');
@@ -53,12 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnAddBuyer = document.getElementById('btn-add-buyer');
     const btnSaveSettings = document.getElementById('btn-save-settings');
     
-    // Invoice Page Elements
     const invoiceSection = document.getElementById('invoice-section');
     const invoiceMonthInput = document.getElementById('invoice-month');
     const btnLoadInvoice = document.getElementById('btn-load-invoice');
     
-    // Investments & Goals Elements
     const investmentForm = document.getElementById('investment-form');
     const goalForm = document.getElementById('goal-form');
     const entryForm = document.getElementById('entry-form');
@@ -66,18 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const goalsContainer = document.getElementById('goals-container');
     const totalInvestedEl = document.getElementById('total-invested');
 
-    // Wallet Elements
     const walletForm = document.getElementById('wallet-form');
     const walletTable = document.querySelector('#wallet-table tbody');
     const totalWalletBalanceEl = document.getElementById('total-wallet-balance');
 
-    // Card Form Element
     const cardForm = document.getElementById('card-form');
 
-    // Collapsible Sections
     const collapsibles = document.querySelectorAll('.collapsible .section-header');
 
-    // State
     let currentCategories = [];
     let currentBuyers = [];
     let isEditing = false;
@@ -86,24 +72,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFilter = 'all'; 
     let selectedYear = new Date().getFullYear().toString();
     
-    // Pagination State
     let currentPage = 1;
     const itemsPerPage = 30;
     let allTableData = []; 
     
-    // Chart State
     let chartGranularity = 'month'; 
     let chartDays = 30;
     let detChartGranularity = 'month';
     let detChartDays = 30;
     
-    // Data Cache
-    let cachedIncomes = [];
-    let cachedExpenses = [];
-    let cachedInvestments = [];
     let cachedDetailedExpenses = []; 
     
-    // Default dates
     const today = new Date().toISOString().split('T')[0];
     if(document.getElementById('inc-date')) document.getElementById('inc-date').value = today;
     if(document.getElementById('exp-date')) document.getElementById('exp-date').value = today;
@@ -113,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let financeChart = null;
     let detailedChart = null;
 
-    // --- Initial Load ---
     loadSettings(); 
 
     if(document.getElementById('financeChart')) {
@@ -142,7 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadWallets();
     }
 
-    // --- Event Listeners ---
     
     collapsibles.forEach(header => {
         header.addEventListener('click', () => {
@@ -160,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(searchTerm) searchTerm.addEventListener('input', () => loadDetailedData(true));
 
-    // Dashboard Filter Events
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             filterBtns.forEach(b => b.classList.remove('active'));
@@ -182,7 +158,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Dashboard Chart Controls
     chartBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             chartBtns.forEach(b => b.classList.remove('active'));
@@ -190,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chartGranularity = btn.dataset.granularity;
             if(chartGranularity === 'day') zoomContainer.style.display = 'flex';
             else zoomContainer.style.display = 'none';
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            loadData();
         });
     });
 
@@ -198,18 +173,16 @@ document.addEventListener('DOMContentLoaded', () => {
         chartZoom.addEventListener('input', () => {
             chartDays = parseInt(chartZoom.value);
             zoomLabel.textContent = `${chartDays} Dias`;
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            loadData();
         });
     }
 
-    // View Mode Listener
     if(viewModeSelect) {
         viewModeSelect.addEventListener('change', () => {
-            updateChart(cachedIncomes, cachedExpenses, cachedInvestments);
+            loadData();
         });
     }
     
-    // Detailed Chart Controls
     detChartBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             detChartBtns.forEach(b => b.classList.remove('active'));
@@ -229,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Settings Events
     if(btnSettings) {
         btnSettings.addEventListener('click', () => {
             settingsModal.style.display = 'flex';
@@ -247,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSaveSettings.addEventListener('click', saveSettings);
     }
 
-    // Invoice Events
     if(btnLoadInvoice) {
         btnLoadInvoice.addEventListener('click', () => {
             const cardId = invoiceSection.dataset.cardId;
@@ -255,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Investments & Goals Events
     if(investmentForm) {
         investmentForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -328,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Card Form Listener
     if(cardForm) {
         cardForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -349,19 +318,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     cardForm.reset();
                     loadCardsPage();
-                    alert('Cartão adicionado com sucesso!');
+                    alert('Card added successfully!');
                 } else {
-                    alert('Erro ao adicionar cartão');
+                    alert('Error adding card');
                 }
             } catch (err) { console.error(err); }
         });
     }
 
-    // --- Functions ---
-
     function toggleCardSelect() {
         const method = methodSelect.value;
-        if (method === 'credito') {
+        if (method === 'credit') {
             cardGroup.style.display = 'grid';
         } else {
             cardGroup.style.display = 'none';
@@ -376,8 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
         searchEnd.value = '';
         loadData(false);
     }
-
-    // --- Settings Logic ---
 
     async function loadSettings() {
         try {
@@ -399,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(res.ok) {
                 settingsModal.style.display = 'none';
                 updateSelects();
-                alert('Configurações salvas!');
+                alert('Settings saved!');
             }
         } catch (err) { console.error(err); }
     }
@@ -459,8 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Wallet Logic ---
-
     async function loadWallets() {
         try {
             const res = await fetch('/api/wallets');
@@ -503,8 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetch(`/api/wallets/${id}`, { method: 'DELETE' });
         loadWallets();
     };
-
-    // --- Investments & Goals Logic ---
 
     async function loadInvestments() {
         try {
@@ -620,8 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGoals();
     };
 
-    // --- Data Logic (Dashboard) ---
-
     async function loadYears() {
         try {
             const res = await fetch('/api/years');
@@ -647,7 +606,6 @@ document.addEventListener('DOMContentLoaded', () => {
             selects.forEach(sel => {
                 if(sel) {
                     const currentVal = sel.value;
-                    // Keep "Nenhum" option for consCardSelect
                     const defaultOpt = sel.id === 'cons-card' ? '<option value="">Nenhum</option>' : '<option value="">Selecione...</option>';
                     sel.innerHTML = defaultOpt;
                     
@@ -673,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let data = {};
 
         if (isIncome) {
-            url = '/api/incomes'; // Explicitly set URL for income
+            url = '/api/incomes';
             data = {
                 description: document.getElementById('inc-desc').value,
                 amount: parseFloat(document.getElementById('inc-amount').value),
@@ -685,8 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method = 'PUT';
             }
         } else if (type === 'consolidated') {
-            // Macro Expense
-            url = '/api/macro-expenses'; // NEW ENDPOINT
+            url = '/api/macro-expenses';
             data = {
                 description: document.getElementById('cons-desc').value,
                 amount: parseFloat(document.getElementById('cons-amount').value),
@@ -701,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 method = 'PUT';
             }
         } else {
-            // Micro Expense
             data = {
                 description: document.getElementById('exp-desc').value,
                 amount: parseFloat(document.getElementById('exp-amount').value),
@@ -743,14 +699,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(window.location.pathname === '/detailed') loadDetailedData();
                 else loadData(); 
             } else {
-                alert('Erro ao salvar dados');
+                alert('Error saving data');
             }
         } catch (error) {
             console.error('Error:', error);
         }
     }
-
-    // --- Edit Logic ---
 
     window.editExpense = function(expenseStr) {
         const item = JSON.parse(decodeURIComponent(expenseStr));
@@ -759,7 +713,6 @@ document.addEventListener('DOMContentLoaded', () => {
         editingId = item._id;
         
         if (item.type === 'income') {
-            // Income Edit
             editingType = 'income';
             if(incomeForm) {
                 document.getElementById('inc-desc').value = item.description;
@@ -772,7 +725,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(section.classList.contains('collapsed')) section.classList.remove('collapsed');
                 incomeForm.scrollIntoView({ behavior: 'smooth' });
                 
-                // Add cancel button
                 let cancelBtn = document.getElementById('btn-cancel-income');
                 if(!cancelBtn) {
                     cancelBtn = document.createElement('button');
@@ -787,7 +739,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelBtn.style.display = 'block';
             }
         } else if (item.is_consolidated || item.source === 'macro') {
-            // Macro Edit
             editingType = 'macro';
             if(consolidatedForm) {
                 document.getElementById('cons-desc').value = item.description;
@@ -795,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('cons-date').value = item.date;
                 document.getElementById('cons-category').value = item.category || '';
                 document.getElementById('cons-card').value = item.card_id || '';
-                document.getElementById('cons-method').value = item.payment_method || 'debito';
+                document.getElementById('cons-method').value = item.payment_method || 'debit';
                 
                 if(btnSaveConsolidated) btnSaveConsolidated.textContent = 'Atualizar Conta';
                 
@@ -817,7 +768,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelBtn.style.display = 'block';
             }
         } else {
-            // Micro Edit
             editingType = 'micro';
             document.getElementById('exp-desc').value = item.description;
             document.getElementById('exp-amount').value = item.amount;
@@ -825,10 +775,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('exp-establishment').value = item.establishment || '';
             document.getElementById('exp-buyer').value = item.buyer || '';
             document.getElementById('exp-category').value = item.category || '';
-            document.getElementById('exp-method').value = item.payment_method || 'debito';
+            document.getElementById('exp-method').value = item.payment_method || 'debit';
             document.getElementById('exp-obs').value = item.observation || '';
             
-            if (item.payment_method === 'credito') {
+            if (item.payment_method === 'credit') {
                 cardGroup.style.display = 'grid';
                 document.getElementById('exp-card').value = item.card_id || '';
                 document.getElementById('exp-installments').value = item.installments || '';
@@ -850,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let url = `/api/expenses/${id}`;
         if(source === 'macro') url = `/api/macro-expenses/${id}`;
-        else if(source === 'income') url = `/api/incomes/${id}`; // Need to implement DELETE for incomes
+        else if(source === 'income') url = `/api/incomes/${id}`;
         
         try {
             const res = await fetch(url, { method: 'DELETE' });
@@ -890,8 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if(cancelBtn) cancelBtn.style.display = 'none';
         }
     }
-
-    // --- Cards Page Logic ---
 
     async function loadCardsPage() {
         try {
@@ -943,7 +891,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('invoice-total').textContent = formatCurrency(data.total);
             document.getElementById('invoice-period').textContent = `Período: ${formatDate(data.period.start)} a ${formatDate(data.period.end)}`;
             
-            // Buyers Breakdown
             const buyersDiv = document.getElementById('buyers-breakdown');
             buyersDiv.innerHTML = '';
             for (const [buyer, amount] of Object.entries(data.buyers_summary)) {
@@ -952,7 +899,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 buyersDiv.appendChild(p);
             }
 
-            // Table
             const tbody = document.querySelector('#invoice-table tbody');
             tbody.innerHTML = '';
             data.expenses.forEach(exp => {
@@ -970,89 +916,45 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) { console.error(err); }
     }
 
-    // --- Shared Logic ---
-
     async function loadData(isSearch = false) {
         try {
-            // Dashboard loads Consolidated + Non-Credit Detailed
-            let expenseUrl = '/api/expenses?view_type=consolidated';
-            let macroUrl = '/api/macro-expenses'; // NEW
-            
-            // Apply dashboard filters
-            let startDate = '';
-            let endDate = '';
-            const now = new Date();
-            
-            if (currentFilter === '30') {
-                const past = new Date();
-                past.setDate(now.getDate() - 30);
-                startDate = past.toISOString().split('T')[0];
-                endDate = now.toISOString().split('T')[0];
-            } else if (currentFilter === '180') {
-                const past = new Date();
-                past.setMonth(now.getMonth() - 6);
-                startDate = past.toISOString().split('T')[0];
-                endDate = now.toISOString().split('T')[0];
-            } else if (currentFilter === 'year') {
-                startDate = `${selectedYear}-01-01`;
-                endDate = `${selectedYear}-12-31`;
-            }
-            
-            if(currentFilter !== 'all') {
-                expenseUrl += `&start_date=${startDate}&end_date=${endDate}`;
-                macroUrl += `?start_date=${startDate}&end_date=${endDate}`;
-            }
-            
-            let incomeUrl = '/api/incomes';
-            if(currentFilter !== 'all') {
-                incomeUrl += `?start_date=${startDate}&end_date=${endDate}`;
-            }
+            const params = new URLSearchParams({
+                period: currentFilter,
+                year: selectedYear,
+                granularity: chartGranularity,
+                view_mode: viewModeSelect ? viewModeSelect.value : 'general'
+            });
 
-            const [incomesRes, expensesRes, macroRes, investmentsRes, allInvestmentsRes, balanceRes] = await Promise.all([
-                fetch(incomeUrl), 
-                fetch(expenseUrl),
-                fetch(macroUrl),
-                fetch('/api/investments/history'),
-                fetch('/api/investments'),
-                fetch('/api/balance')
-            ]);
+            const res = await fetch(`/api/dashboard?${params.toString()}`);
+            const data = await res.json();
 
-            const incomes = await incomesRes.json();
-            const expenses = await expensesRes.json();
-            const macroExpenses = await macroRes.json();
-            const investmentsHistory = await investmentsRes.json();
-            const currentInvestments = await allInvestmentsRes.json();
-            const balanceData = await balanceRes.json();
-            
-            // Combine Micro and Macro for Dashboard
-            const allExpenses = [...macroExpenses];
-            
-            cachedIncomes = incomes;
-            cachedExpenses = allExpenses;
-            cachedInvestments = investmentsHistory;
+            updateDashboard(data.summary);
+            updateChart(data.chart_data);
 
-            updateDashboard(incomes, allExpenses, currentInvestments, balanceData);
-            updateChart(incomes, allExpenses, investmentsHistory);
-            
-            // Pagination Logic
-            allTableData = [
-                ...incomes.map(i => ({...i, type: 'income', source: 'income'})), // Add source
-                ...allExpenses.map(e => ({...e, type: 'expense'}))
-            ];
-            allTableData.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            currentPage = 1;
-            renderPagination();
-            renderTablePage();
-
+            loadTransactionsPage(1);
         } catch (error) {
             console.error('Error loading data:', error);
         }
     }
 
+    async function loadTransactionsPage(page) {
+        try {
+            const res = await fetch(`/api/transactions?page=${page}`);
+            const pageData = await res.json();
+            
+            allTableData = pageData.items; 
+            currentPage = pageData.current_page;
+            
+            renderPagination(pageData);
+            renderTablePage();
+        } catch (error) {
+            console.error('Error loading transactions:', error);
+        }
+    }
+
     async function loadDetailedData(isSearch = false) {
         try {
-            let url = '/api/expenses?view_type=detailed'; // Load everything for detailed view
+            let url = '/api/expenses?view_type=detailed';
             if(isSearch && searchTerm.value) {
                 url += `&search=${searchTerm.value}`;
             }
@@ -1068,7 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const row = document.createElement('tr');
                 
                 let details = '';
-                if (item.payment_method === 'credito' && item.card_name) {
+                if (item.payment_method === 'credit' && item.card_name) {
                     details = `<span class="badge card">💳 ${item.card_name}</span>`;
                     if (item.installments) details += ` <span class="badge installments">${item.installments}x</span>`;
                 } else {
@@ -1098,34 +1000,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) { console.error(err); }
     }
 
-    function updateDashboard(incomes, expenses, currentInvestments, balanceData) {
-        const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
-        const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
-        
-        // CORREÇÃO AQUI: Usar o saldo da API (balanceData.balance)
-        const balance = balanceData.balance; 
-
-        document.getElementById('total-income').textContent = formatCurrency(totalIncome);
-        document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
+    function updateDashboard(summary) {
+        document.getElementById('total-income').textContent = formatCurrency(summary.total_income);
+        document.getElementById('total-expense').textContent = formatCurrency(summary.total_expense);
         
         const balanceEl = document.getElementById('balance');
-        balanceEl.textContent = formatCurrency(balance);
-        balanceEl.style.color = balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+        balanceEl.textContent = formatCurrency(summary.balance);
+        balanceEl.style.color = summary.balance >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
 
-        const totalInvested = currentInvestments.reduce((sum, inv) => sum + inv.current_amount, 0);
-        const netWorth = balance + totalInvested;
-
-        document.getElementById('total-invested-dash').textContent = formatCurrency(totalInvested);
-        document.getElementById('net-worth').textContent = formatCurrency(netWorth);
+        document.getElementById('total-invested-dash').textContent = formatCurrency(summary.total_invested);
+        document.getElementById('net-worth').textContent = formatCurrency(summary.net_worth);
     }
 
-    function renderPagination() {
+    function renderPagination(pageData) {
         if(!paginationControls) return;
         paginationControls.innerHTML = '';
         
-        const totalPages = Math.ceil(allTableData.length / itemsPerPage);
+        const { total_items, current_page, total_pages } = pageData || { total_items: 0, current_page: 1, total_pages: 1 };
         
-        // Add summary text
         const summary = document.createElement('div');
         summary.style.width = '100%';
         summary.style.textAlign = 'center';
@@ -1133,21 +1025,19 @@ document.addEventListener('DOMContentLoaded', () => {
         summary.style.fontSize = '0.9rem';
         summary.style.color = 'var(--text-secondary)';
         
-        const start = (currentPage - 1) * itemsPerPage + 1;
-        const end = Math.min(currentPage * itemsPerPage, allTableData.length);
-        summary.textContent = `Mostrando ${start}-${end} de ${allTableData.length} registros`;
+        const start = (current_page - 1) * itemsPerPage + 1;
+        const end = Math.min(current_page * itemsPerPage, total_items);
+        summary.textContent = `Mostrando ${start}-${end} de ${total_items} registros`;
         paginationControls.appendChild(summary);
 
-        if(totalPages <= 1) return;
+        if(total_pages <= 1) return;
 
-        for(let i = 1; i <= totalPages; i++) {
+        for(let i = 1; i <= total_pages; i++) {
             const btn = document.createElement('button');
-            btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+            btn.className = `page-btn ${i === current_page ? 'active' : ''}`;
             btn.textContent = i;
             btn.onclick = () => {
-                currentPage = i;
-                renderPagination();
-                renderTablePage();
+                loadTransactionsPage(i);
             };
             paginationControls.appendChild(btn);
         }
@@ -1155,9 +1045,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTablePage() {
         historyTableBody.innerHTML = '';
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        const pageItems = allTableData.slice(start, end);
+        
+        const pageItems = allTableData;
 
         pageItems.forEach(item => {
             const row = document.createElement('tr');
@@ -1196,173 +1085,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateChart(incomes, expenses, investments) {
+    function updateChart(chartData) {
         const ctx = document.getElementById('financeChart').getContext('2d');
-        const dataMap = {};
-        
-        const viewMode = document.getElementById('chart-view-mode').value; // Get view mode
-
-        const getKey = (dateStr) => {
-            if (chartGranularity === 'day') return dateStr; 
-            if (chartGranularity === 'year') return dateStr.substring(0, 4); 
-            return dateStr.substring(0, 7); 
-        };
-
-        if (viewMode === 'general') {
-            // --- GENERAL MODE (Income vs Expense vs Investment) ---
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                if (incomes.includes(item)) dataMap[key].income += item.amount;
-                else dataMap[key].expense += item.amount;
-            });
-
-            investments.forEach(inv => {
-                if(inv.type === 'contribution') {
-                    const key = getKey(inv.date);
-                    if (!dataMap[key]) dataMap[key] = { income: 0, expense: 0, investment: 0 };
-                    dataMap[key].investment += inv.amount;
-                }
-            });
-        } else {
-            // --- CATEGORY MODE (Income vs Category A vs Category B...) ---
-            // 1. Identify all unique categories present in the data
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            // 2. Initialize dataMap with dynamic keys
-            [...incomes, ...expenses].forEach(item => {
-                const key = getKey(item.date);
-                if (!dataMap[key]) {
-                    dataMap[key] = { income: 0 };
-                    allCategories.forEach(cat => dataMap[key][cat] = 0);
-                }
-                
-                if (incomes.includes(item)) {
-                    dataMap[key].income += item.amount;
-                } else {
-                    const cat = item.category || 'Outros';
-                    dataMap[key][cat] += item.amount;
-                }
-            });
-        }
-
-        let sortedKeys = Object.keys(dataMap).sort();
-        
-        if (chartGranularity === 'day') {
-            sortedKeys = sortedKeys.slice(-chartDays);
-        }
-        
-        const labels = sortedKeys.map(k => {
-            if (chartGranularity === 'day') {
-                const [y, m, d] = k.split('-');
-                return `${d}/${m}`;
-            }
-            if (chartGranularity === 'year') return k;
-            const [y, m] = k.split('-');
-            return `${m}/${y}`;
-        });
-
-        // --- DATASETS GENERATION ---
-        let datasets = [];
-
-        if (viewMode === 'general') {
-            datasets = [
-                { 
-                    label: 'Rendas', 
-                    data: sortedKeys.map(k => dataMap[k].income), 
-                    borderColor: '#2ecc71', 
-                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                    tension: 0.4, 
-                    fill: true
-                },
-                { 
-                    label: 'Saídas', 
-                    data: sortedKeys.map(k => dataMap[k].expense), 
-                    borderColor: '#e74c3c', 
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                },
-                { 
-                    label: 'Investido', 
-                    data: sortedKeys.map(k => dataMap[k].investment), 
-                    borderColor: '#3498db', 
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }
-            ];
-        } else {
-            // Category Mode Datasets
-            // 1. Income (Always present)
-            datasets.push({
-                label: 'Rendas',
-                data: sortedKeys.map(k => dataMap[k].income),
-                borderColor: '#2ecc71', 
-                backgroundColor: 'rgba(46, 204, 113, 0.05)',
-                tension: 0.4,
-                fill: true
-                // REMOVED borderDash
-            });
-
-            // 2. Generate colors for categories
-            const colors = [
-                '#e74c3c', '#e67e22', '#f1c40f', '#9b59b6', '#3498db', 
-                '#1abc9c', '#34495e', '#7f8c8d', '#c0392b', '#d35400'
-            ];
-            
-            const allCategories = new Set();
-            expenses.forEach(e => allCategories.add(e.category || 'Outros'));
-            
-            let colorIndex = 0;
-            allCategories.forEach(cat => {
-                // Check if category has any value > 0 in the VISIBLE range
-                // AND check if category has started (not just zeros from beginning)
-                
-                let hasStarted = false;
-                const dataPoints = sortedKeys.map(k => {
-                    const val = dataMap[k][cat] || 0;
-                    if (val > 0) hasStarted = true;
-                    
-                    if (!hasStarted) return null; // Don't draw line before first value
-                    return val;
-                });
-
-                // Only add dataset if it has at least one non-null value
-                if (dataPoints.some(v => v !== null && v > 0)) {
-                    const color = colors[colorIndex % colors.length];
-                    datasets.push({
-                        label: cat,
-                        data: dataPoints,
-                        borderColor: color,
-                        backgroundColor: color + '1A', // 10% opacity
-                        tension: 0.4,
-                        fill: false // Don't fill categories to avoid mess
-                    });
-                    colorIndex++;
-                }
-            });
-        }
+        const fontSans = "'Inter', sans-serif";
+        const fontMono = "'Fira Code', monospace";
 
         if (financeChart) financeChart.destroy();
         
         financeChart = new Chart(ctx, {
             type: 'line', 
             data: {
-                labels: labels,
-                datasets: datasets
+                labels: chartData.labels,
+                datasets: chartData.datasets.map(ds => ({
+                    ...ds,
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.2,
+                    fill: ds.fill !== undefined ? ds.fill : true
+                }))
             },
             options: {
                 responsive: true, 
                 maintainAspectRatio: false,
+                onClick: (e, activeElements, chart) => {
+                    if (typeof handleChartClick === 'function') {
+                        handleChartClick(e, activeElements, chart, 'macro', selectedYear);
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false,
                 },
                 plugins: { 
-                    legend: { labels: { color: '#e6e1de' } },
+                    legend: { 
+                        labels: { 
+                            color: '#e6e1de',
+                            font: { family: fontSans, size: 12, weight: 500 },
+                            boxWidth: 10,
+                            usePointStyle: true
+                        } 
+                    },
                     tooltip: {
+                        backgroundColor: 'rgba(26, 24, 23, 0.9)',
+                        titleFont: { family: fontSans, size: 13 },
+                        bodyFont: { family: fontMono, size: 12 },
+                        borderColor: '#2a2827',
+                        borderWidth: 1,
+                        cornerRadius: 2,
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -1378,8 +1148,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
-                    x: { grid: { display: false }, ticks: { color: '#8f8681' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: '#2a2827', borderDash: [2, 4], drawBorder: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontMono, size: 10 } } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontSans, size: 11 } } 
+                    }
                 }
             }
         });
@@ -1387,6 +1164,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function updateDetailedChart(expenses) {
         const ctx = document.getElementById('detailedChart').getContext('2d');
+        const fontSans = "'Inter', sans-serif";
+        const fontMono = "'Fira Code', monospace";
         const dataMap = {};
         
         const getKey = (dateStr) => {
@@ -1399,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = getKey(item.date);
             if (!dataMap[key]) dataMap[key] = { credit: 0, debit: 0 };
             
-            if (item.payment_method === 'credito') {
+            if (item.payment_method === 'credit') {
                 dataMap[key].credit += item.amount;
             } else {
                 dataMap[key].debit += item.amount;
@@ -1434,29 +1213,53 @@ document.addEventListener('DOMContentLoaded', () => {
                         data: sortedKeys.map(k => dataMap[k].credit), 
                         borderColor: '#9b59b6', 
                         backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                        tension: 0.4, 
-                        fill: true
+                        tension: 0.2, 
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
                     },
                     { 
                         label: 'Débito/Outros', 
                         data: sortedKeys.map(k => dataMap[k].debit), 
                         borderColor: '#e67e22', 
                         backgroundColor: 'rgba(230, 126, 34, 0.1)',
-                        tension: 0.4,
-                        fill: true
+                        tension: 0.2,
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
                     }
                 ]
             },
             options: {
                 responsive: true, 
                 maintainAspectRatio: false,
+                onClick: (e, activeElements, chart) => {
+                    if (typeof handleChartClick === 'function') {
+                        handleChartClick(e, activeElements, chart, 'micro', selectedYear);
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false,
                 },
                 plugins: { 
-                    legend: { labels: { color: '#e6e1de' } },
+                    legend: { 
+                        labels: { 
+                            color: '#e6e1de',
+                            font: { family: fontSans, size: 12, weight: 500 },
+                            boxWidth: 10,
+                            usePointStyle: true
+                        } 
+                    },
                     tooltip: {
+                        backgroundColor: 'rgba(26, 24, 23, 0.9)',
+                        titleFont: { family: fontSans, size: 13 },
+                        bodyFont: { family: fontMono, size: 12 },
+                        borderColor: '#2a2827',
+                        borderWidth: 1,
+                        cornerRadius: 2,
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -1472,8 +1275,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 },
                 scales: {
-                    y: { beginAtZero: true, grid: { color: '#2a2827' }, ticks: { color: '#8f8681' } },
-                    x: { grid: { display: false }, ticks: { color: '#8f8681' } }
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: '#2a2827', borderDash: [2, 4], drawBorder: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontMono, size: 10 } } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#8f8681', font: { family: fontSans, size: 11 } } 
+                    }
                 }
             }
         });

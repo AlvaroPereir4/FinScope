@@ -6,6 +6,7 @@
     <title>Gastos Detalhados - FinScope</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -28,7 +29,6 @@
                 <h2>Gastos Detalhados (Micro)</h2>
             </div>
 
-            <!-- Gráfico Detalhado -->
             <section class="charts-container">
                 <div class="chart-card">
                     <div class="chart-header">
@@ -51,7 +51,6 @@
                 </div>
             </section>
 
-            <!-- Formulário Completo (Colapsável) -->
             <section class="input-section collapsible collapsed">
                 <div class="section-header">
                     <h2>Novo Registro Detalhado</h2>
@@ -85,7 +84,6 @@
                             <div class="form-group">
                                 <label>Comprador</label>
                                 <select id="exp-buyer">
-                                    <!-- JS populates -->
                                 </select>
                             </div>
                         </div>
@@ -94,7 +92,6 @@
                             <div class="form-group">
                                 <label>Categoria</label>
                                 <select id="exp-category">
-                                    <!-- JS populates -->
                                 </select>
                             </div>
                             <div class="form-group">
@@ -112,7 +109,6 @@
                             <div class="form-group">
                                 <label>Cartão</label>
                                 <select id="exp-card">
-                                    <!-- JS populates -->
                                 </select>
                             </div>
                             <div class="form-group" id="installments-group">
@@ -134,7 +130,6 @@
                 </div>
             </section>
 
-            <!-- Tabela de Histórico Completo -->
             <section class="history-section">
                 <div class="section-header">
                     <h3>Histórico Completo</h3>
@@ -155,7 +150,6 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- JS will populate -->
                         </tbody>
                     </table>
                 </div>
@@ -164,5 +158,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 </body>
 </html>

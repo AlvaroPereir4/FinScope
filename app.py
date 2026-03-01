@@ -22,6 +22,13 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+CATEGORY_COLORS = [
+    "#e74c3c", "#e67e22", "#f1c40f", "#2ecc71", "#1abc9c", 
+    "#3498db", "#9b59b6", "#34495e", "#16a085", "#27ae60", 
+    "#2980b9", "#8e44ad", "#2c3e50", "#f39c12", "#d35400", 
+    "#c0392b", "#bdc3c7", "#7f8c8d"
+]
+
 class User(UserMixin):
     def __init__(self, user_doc):
         self.id = str(user_doc['_id'])
@@ -33,7 +40,8 @@ def load_user(user_id):
     try:
         user_data = db.users.find_one({"_id": ObjectId(user_id)})
         if user_data: return User(user_data)
-    except: pass
+    except Exception as e:
+        pass
     return None
 
 def serialize_doc(doc, source=None):
@@ -45,7 +53,6 @@ def serialize_doc(doc, source=None):
     if source: doc['source'] = source
     return doc
 
-# --- Rotas Auth ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -81,7 +88,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# --- Pages ---
 @app.route('/')
 @login_required
 def index():
@@ -112,8 +118,6 @@ def goals_page():
 def wallet_page():
     return render_template('wallet.html')
 
-# --- API ---
-
 @app.route('/api/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
@@ -127,10 +131,8 @@ def settings():
 
     settings = db.user_settings.find_one({"user_id": ObjectId(current_user.id)})
     if not settings:
-        return jsonify({"categories": ["Alimentação", "Moradia", "Transporte"], "buyers": ["Eu"]})
+        return jsonify({"categories": ["Food", "Housing", "Transport"], "buyers": ["Me"]})
     return jsonify(serialize_doc(settings))
-
-# --- Helpers Dashboard ---
 
 @app.route('/api/years', methods=['GET'])
 @login_required
@@ -164,7 +166,231 @@ def get_total_balance():
     total_balance = res[0]['total'] if res else 0
     return jsonify({"balance": total_balance})
 
-# --- CARTEIRA (WALLETS) ---
+@app.route('/api/transactions', methods=['GET'])
+@login_required
+def get_transactions():
+    page = int(request.args.get('page', 1))
+    items_per_page = int(request.args.get('limit', 30))
+    date_filter = request.args.get('date')
+    scope = request.args.get('scope', 'macro')
+    
+    user_id = ObjectId(current_user.id)
+
+    match_query = {"user_id": user_id}
+    if date_filter:
+        if len(date_filter) == 7:
+            match_query["date"] = {"$regex": f"^{date_filter}"}
+        else:
+            match_query["date"] = date_filter
+
+    expense_coll = "expenses" if scope == 'micro' else "macro_expenses"
+    source_label = "micro" if scope == 'micro' else "macro"
+
+    pipeline = [
+        {"$unionWith": {"coll": expense_coll, "pipeline": [{"$addFields": {"type": "expense", "source": source_label}}]}},
+        {"$match": match_query},
+        {"$sort": {"date": -1}},
+        {"$facet": {
+            "metadata": [{"$count": "total"}],
+            "data": [{"$skip": (page - 1) * items_per_page}, {"$limit": items_per_page}]
+        }}
+    ]
+
+    incomes_pipeline_base = [{"$addFields": {"type": "income", "source": "income"}}]
+    result = list(db.incomes.aggregate(incomes_pipeline_base + pipeline))
+
+    total_items = result[0]['metadata'][0]['total'] if result and result[0]['metadata'] else 0
+    transactions = result[0]['data'] if result and result[0]['data'] else []
+
+    serialized_transactions = [serialize_doc(t) for t in transactions]
+
+    return jsonify({
+        "items": serialized_transactions,
+        "total_items": total_items,
+        "current_page": page,
+        "total_pages": (total_items + items_per_page - 1) // items_per_page
+    })
+
+@app.route('/api/dashboard', methods=['GET'])
+@login_required
+def get_dashboard_data():
+    period = request.args.get('period', 'all')
+    year = request.args.get('year', str(datetime.now().year))
+    granularity = request.args.get('granularity', 'month')
+    view_mode = request.args.get('view_mode', 'general')
+
+    date_filter = {}
+    if period != 'all':
+        end_date = datetime.now()
+        if period == '30':
+            start_date = end_date - timedelta(days=30)
+        elif period == '180':
+            start_date = end_date - relativedelta(months=6)
+        elif period == 'year':
+            start_date = datetime(int(year), 1, 1)
+            end_date = datetime(int(year), 12, 31)
+        
+        date_filter = {"date": {"$gte": start_date.strftime('%Y-%m-%d'), "$lte": end_date.strftime('%Y-%m-%d')}}
+
+    user_id_filter = {"user_id": ObjectId(current_user.id)}
+    
+    total_income = sum(d['amount'] for d in db.incomes.find({**user_id_filter, **date_filter}))
+    total_expense_macro = sum(d['amount'] for d in db.macro_expenses.find({**user_id_filter, **date_filter}))
+    total_expense = total_expense_macro
+
+    balance_res = list(db.wallets.aggregate([{"$match": user_id_filter}, {"$group": {"_id": None, "total": {"$sum": "$balance"}}}]))
+    balance = balance_res[0]['total'] if balance_res else 0
+
+    invested_res = list(db.investments.aggregate([{"$match": user_id_filter}, {"$group": {"_id": None, "total": {"$sum": "$current_amount"}}}]))
+    total_invested = invested_res[0]['total'] if invested_res else 0
+
+    summary = {
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": balance,
+        "total_invested": total_invested,
+        "net_worth": balance + total_invested
+    }
+
+    if granularity == 'day':
+        group_id = {"$dateToString": {"format": "%Y-%m-%d", "date": {"$toDate": "$date"}}}
+        sort_field = "_id"
+    elif granularity == 'year':
+        group_id = {"$substr": ["$date", 0, 4]}
+        sort_field = "_id"
+    else:
+        group_id = {"$substr": ["$date", 0, 7]}
+        sort_field = "_id"
+
+    chart_data = {}
+
+    if view_mode == 'category':
+        pipeline_macro = [
+            {"$match": {**user_id_filter, **date_filter}},
+            {"$project": {"amount": 1, "date": 1, "category": {"$ifNull": ["$category", "Others"]}}},
+            {"$group": {
+                "_id": {"date": group_id, "category": "$category"},
+                "total": {"$sum": "$amount"}
+            }},
+            {"$sort": {"_id.date": 1}}
+        ]
+        results_macro = list(db.macro_expenses.aggregate(pipeline_macro))
+        
+        pipeline_income = [
+            {"$match": {**user_id_filter, **date_filter}},
+            {"$project": {"amount": 1, "date": 1, "category": {"$literal": "Income"}}},
+            {"$group": {
+                "_id": {"date": group_id, "category": "$category"},
+                "total": {"$sum": "$amount"}
+            }},
+            {"$sort": {"_id.date": 1}}
+        ]
+        results_income = list(db.incomes.aggregate(pipeline_income))
+        
+        results = results_macro + results_income
+        
+        data_map = {}
+        all_categories = set()
+        all_dates = set()
+
+        for item in results:
+            date_key = item['_id']['date']
+            cat = item['_id']['category']
+            total = item['total']
+            
+            if date_key not in data_map: data_map[date_key] = {}
+            data_map[date_key][cat] = total
+            all_categories.add(cat)
+            all_dates.add(date_key)
+            
+        sorted_dates = sorted(list(all_dates))
+        sorted_categories = sorted(list(all_categories))
+        
+        labels = []
+        for key in sorted_dates:
+            if granularity == 'day':
+                labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
+            elif granularity == 'month':
+                labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
+            else:
+                labels.append(key)
+
+        datasets = []
+        for idx, cat in enumerate(sorted_categories):
+            data_points = []
+            for date_key in sorted_dates:
+                data_points.append(data_map.get(date_key, {}).get(cat, 0))
+            
+            if cat == 'Income':
+                color = "#2ecc71"
+            else:
+                color = CATEGORY_COLORS[idx % len(CATEGORY_COLORS)]
+
+            datasets.append({
+                "label": cat,
+                "data": data_points,
+                "borderColor": color,
+                "backgroundColor": color + "1A",
+                "tension": 0.2,
+                "fill": False,
+                "borderWidth": 2 if cat == 'Income' else 1.5,
+                "pointRadius": 0,
+                "pointHoverRadius": 4
+            })
+            
+        chart_data = {"labels": labels, "datasets": datasets}
+
+    else:
+        def aggregate_by_granularity(collection, amount_field='amount', extra_filter=None):
+            match_filter = {**user_id_filter, **date_filter}
+            if extra_filter:
+                match_filter.update(extra_filter)
+                
+            pipeline = [
+                {"$match": match_filter},
+                {"$group": {"_id": group_id, "total": {"$sum": f"${amount_field}"}}},
+                {"$sort": {sort_field: 1}}
+            ]
+            return {item['_id']: item['total'] for item in collection.aggregate(pipeline)}
+
+        income_data = aggregate_by_granularity(db.incomes)
+        expense_macro_data = aggregate_by_granularity(db.macro_expenses)
+        investment_data = aggregate_by_granularity(db.investment_entries, extra_filter={"type": "contribution"})
+
+        all_keys = sorted(list(set(income_data.keys()) | set(expense_macro_data.keys()) | set(investment_data.keys())))
+        
+        labels = []
+        income_values = []
+        expense_values = []
+        investment_values = []
+
+        for key in all_keys:
+            if granularity == 'day':
+                labels.append(datetime.strptime(key, '%Y-%m-%d').strftime('%d/%m'))
+            elif granularity == 'month':
+                labels.append(datetime.strptime(key, '%Y-%m').strftime('%m/%Y'))
+            else:
+                labels.append(key)
+            
+            income_values.append(income_data.get(key, 0))
+            total_exp = expense_macro_data.get(key, 0)
+            expense_values.append(total_exp)
+            investment_values.append(investment_data.get(key, 0))
+
+        chart_data = {
+            "labels": labels,
+            "datasets": [
+                {"label": "Income", "data": income_values, "borderColor": "#2ecc71", "backgroundColor": "rgba(46, 204, 113, 0.1)", "tension": 0.4, "fill": True},
+                {"label": "Expenses", "data": expense_values, "borderColor": "#e74c3c", "backgroundColor": "rgba(231, 76, 60, 0.1)", "tension": 0.4, "fill": True},
+                {"label": "Invested", "data": investment_values, "borderColor": "#3498db", "backgroundColor": "rgba(52, 152, 219, 0.1)", "tension": 0.4, "fill": True}
+            ]
+        }
+
+    return jsonify({
+        "summary": summary,
+        "chart_data": chart_data
+    })
+
 @app.route('/api/wallets', methods=['GET', 'POST'])
 @app.route('/api/wallets/<wallet_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -198,11 +424,9 @@ def wallets(wallet_id=None):
         new_wallet['_id'] = res.inserted_id
         return jsonify(serialize_doc(new_wallet))
 
-    # GET
     wallets = list(db.wallets.find({"user_id": ObjectId(current_user.id)}))
     return jsonify([serialize_doc(w) for w in wallets])
 
-# --- Cartões ---
 @app.route('/api/cards', methods=['GET', 'POST'])
 @login_required
 def cards():
@@ -247,7 +471,7 @@ def card_invoice(card_id):
     total_amount = 0
     for exp in expenses:
         amount = float(exp['amount'])
-        buyer = exp.get('buyer', 'Outros') or 'Outros'
+        buyer = exp.get('buyer', 'Others') or 'Others'
         total_amount += amount
         buyers_summary[buyer] = buyers_summary.get(buyer, 0) + amount
         
@@ -259,7 +483,6 @@ def card_invoice(card_id):
         "expenses": [serialize_doc(e, 'micro') for e in expenses]
     })
 
-# --- Rendas (ATUALIZADO COM DELETE/PUT) ---
 @app.route('/api/incomes', methods=['GET', 'POST'])
 @app.route('/api/incomes/<income_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -302,7 +525,6 @@ def incomes(income_id=None):
     incomes = list(db.incomes.find(query).sort("date", -1))
     return jsonify([serialize_doc(i) for i in incomes])
 
-# --- GASTOS MACRO ---
 @app.route('/api/macro-expenses', methods=['GET', 'POST'])
 @app.route('/api/macro-expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -317,9 +539,9 @@ def macro_expenses(expense_id=None):
         update_data = {
             "description": data['description'],
             "amount": float(data['amount']),
-            "category": data.get('category', 'Geral'),
+            "category": data.get('category', 'General'),
             "date": data['date'],
-            "payment_method": data.get('payment_method', 'debito'),
+            "payment_method": data.get('payment_method', 'debit'),
             "card_id": ObjectId(card_id) if card_id else None
         }
         db.macro_expenses.update_one({"_id": ObjectId(expense_id), "user_id": ObjectId(current_user.id)}, {"$set": update_data})
@@ -332,9 +554,9 @@ def macro_expenses(expense_id=None):
             "user_id": ObjectId(current_user.id),
             "description": data['description'],
             "amount": float(data['amount']),
-            "category": data.get('category', 'Geral'),
+            "category": data.get('category', 'General'),
             "date": data['date'],
-            "payment_method": data.get('payment_method', 'debito'),
+            "payment_method": data.get('payment_method', 'debit'),
             "card_id": ObjectId(card_id) if card_id else None,
             "is_consolidated": True,
             "created_at": datetime.utcnow()
@@ -343,7 +565,6 @@ def macro_expenses(expense_id=None):
         new_expense['_id'] = res.inserted_id
         return jsonify([serialize_doc(new_expense, 'macro')])
 
-    # GET
     query = {"user_id": ObjectId(current_user.id)}
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -360,7 +581,6 @@ def macro_expenses(expense_id=None):
             
     return jsonify([serialize_doc(e, 'macro') for e in expenses])
 
-# --- GASTOS MICRO ---
 @app.route('/api/expenses', methods=['GET', 'POST'])
 @app.route('/api/expenses/<expense_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -375,7 +595,7 @@ def expenses(expense_id=None):
         update_data = {
             "description": data['description'],
             "amount": float(data['amount']),
-            "category": data.get('category', 'Geral'),
+            "category": data.get('category', 'General'),
             "date": data['date'],
             "establishment": data.get('establishment'),
             "buyer": data.get('buyer'),
@@ -419,7 +639,7 @@ def expenses(expense_id=None):
                         "user_id": ObjectId(current_user.id),
                         "description": data['description'],
                         "amount": float(data['amount']),
-                        "category": data.get('category', 'Geral'),
+                        "category": data.get('category', 'General'),
                         "date": inst_date_str,
                         "establishment": data.get('establishment'),
                         "buyer": data.get('buyer'),
@@ -438,7 +658,7 @@ def expenses(expense_id=None):
                 "user_id": ObjectId(current_user.id),
                 "description": data['description'],
                 "amount": float(data['amount']),
-                "category": data.get('category', 'Geral'),
+                "category": data.get('category', 'General'),
                 "date": data['date'],
                 "establishment": data.get('establishment'),
                 "buyer": data.get('buyer'),
@@ -453,7 +673,6 @@ def expenses(expense_id=None):
             new_expense['_id'] = res.inserted_id
             return jsonify([serialize_doc(new_expense, 'micro')])
             
-    # GET (Micro)
     query = {"user_id": ObjectId(current_user.id)}
     
     search_term = request.args.get('search')
@@ -476,7 +695,6 @@ def expenses(expense_id=None):
             
     return jsonify([serialize_doc(e, 'micro') for e in expenses])
 
-# --- INVESTIMENTOS ---
 @app.route('/api/investments', methods=['GET', 'POST'])
 @app.route('/api/investments/<inv_id>', methods=['PUT', 'DELETE'])
 @login_required
@@ -548,7 +766,6 @@ def investment_entries(inv_id):
     entries = list(db.investment_entries.find({"investment_id": ObjectId(inv_id)}).sort("date", -1))
     return jsonify([serialize_doc(e) for e in entries])
 
-# --- METAS ---
 @app.route('/api/goals', methods=['GET', 'POST'])
 @app.route('/api/goals/<goal_id>', methods=['PUT', 'DELETE'])
 @login_required

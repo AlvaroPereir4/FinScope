@@ -1,21 +1,25 @@
 :root {
-    /* Fundos */
     --bg-color: #0c0b0b;
     --card-bg: #1a1817;
     
-    /* Textos */
     --text-primary: #e6e1de;
     --text-secondary: #8f8681;
     
-    /* Destaques */
     --accent-color: #e87c03;
     --accent-hover: #ff9838;
     
-    /* Auxiliares */
     --border-color: #2a2827;
     --success-color: #2ecc71;
     --danger-color: #e74c3c;
     --invest-color: #3498db;
+
+    --white: #ffffff;
+    --black: #000000;
+    --surface-hover: #222222;
+    
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'Fira Code', 'Roboto Mono', monospace;
+    --border-radius: 6px;
 }
 
 * {
@@ -25,32 +29,75 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     background-color: var(--bg-color);
     color: var(--text-primary);
     line-height: 1.6;
+    font-size: 14px;
+    letter-spacing: -0.01em;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 98%;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 80px 2rem 2rem 2rem;
 }
 
-/* Header */
 header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background-color: rgba(12, 11, 11, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
+    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 3rem;
-    padding-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.geist-triangle {
+    animation: float-triangle 4s ease-in-out infinite;
+    width: 24px;
+    height: 24px;
+}
+
+@keyframes float-triangle {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+.triangle-path {
+    stroke: var(--white);
+    stroke-width: 1.5px;
+    stroke-dasharray: 30 100;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: border-flow 3s linear infinite;
+}
+
+@keyframes border-flow {
+    to { stroke-dashoffset: -130; }
 }
 
 .logo h1 {
     font-weight: 700;
-    font-size: 1.8rem;
+    font-size: 1.4rem;
     color: var(--text-primary);
+    letter-spacing: -0.03em;
 }
 
 .logo span {
@@ -68,6 +115,8 @@ header {
     text-decoration: none;
     font-weight: 500;
     transition: color 0.2s;
+    font-size: 0.85rem;
+    letter-spacing: -0.01em;
 }
 
 .nav-link:hover {
@@ -92,21 +141,35 @@ header {
 .btn-icon {
     background: none;
     border: none;
-    font-size: 1.2rem;
     cursor: pointer;
-    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
 }
 
 .btn-icon:hover {
-    transform: rotate(45deg);
+    background: rgba(255, 255, 255, 0.05);
 }
 
-/* Dashboard Controls */
+.btn-icon svg {
+    stroke: var(--text-secondary);
+    transition: stroke 0.2s, transform 0.5s ease;
+}
+
+.btn-icon:hover svg {
+    stroke: var(--text-primary);
+    transform: rotate(90deg);
+}
+
 .dashboard-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+    margin-top: 1rem;
 }
 
 .filter-group {
@@ -123,10 +186,11 @@ header {
     border: none;
     color: var(--text-secondary);
     padding: 0.5rem 1rem;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     transition: all 0.2s;
+    font-weight: 500;
 }
 
 .filter-btn:hover {
@@ -134,20 +198,22 @@ header {
 }
 
 .filter-btn.active {
-    background-color: var(--accent-color);
-    color: #fff;
+    background-color: var(--white);
+    color: var(--black);
+    font-weight: 600;
 }
 
 .year-selector select {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+    padding: 0.3rem 1rem;
+    border-radius: var(--border-radius);
     cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
 }
 
-/* Dashboard Grid */
 .dashboard-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -158,22 +224,23 @@ header {
 .card {
     background: var(--card-bg);
     padding: 1.5rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
 }
 
 .card h3 {
     font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
+    font-weight: 500;
 }
 
 .card p {
-    font-size: 2rem;
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
     font-weight: 600;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 .card.income p { color: var(--success-color); }
@@ -181,7 +248,6 @@ header {
 .card.invest p { color: var(--invest-color); }
 .card.net-worth p { color: var(--accent-color); }
 
-/* Charts */
 .charts-container {
     margin-bottom: 2rem;
 }
@@ -189,7 +255,7 @@ header {
 .chart-card {
     background: var(--card-bg);
     padding: 1.5rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     height: 450px;
     display: flex;
@@ -206,8 +272,7 @@ header {
 .chart-header h3 {
     font-size: 1rem;
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-weight: 500;
 }
 
 .chart-controls-wrapper {
@@ -221,7 +286,7 @@ header {
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 0.3rem 0.8rem;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     font-size: 0.8rem;
     outline: none;
@@ -233,7 +298,8 @@ header {
     gap: 0.8rem;
     background: rgba(255,255,255,0.05);
     padding: 0.3rem 0.8rem;
-    border-radius: 20px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
 }
 
 #zoom-label, #det-zoom-label {
@@ -241,6 +307,7 @@ header {
     color: var(--accent-color);
     font-weight: 600;
     min-width: 50px;
+    font-family: var(--font-mono);
 }
 
 input[type=range] {
@@ -279,16 +346,17 @@ input[type=range]::-webkit-slider-thumb:hover {
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     padding: 0.3rem 0.8rem;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     transition: all 0.2s;
+    font-weight: 500;
 }
 
 .chart-btn:hover, .chart-btn.active, .det-chart-btn:hover, .det-chart-btn.active {
-    background: var(--accent-color);
-    color: #fff;
-    border-color: var(--accent-color);
+    background: var(--white);
+    color: var(--black);
+    border-color: var(--white);
 }
 
 .chart-wrapper {
@@ -296,7 +364,6 @@ input[type=range]::-webkit-slider-thumb:hover {
     position: relative;
 }
 
-/* Forms & Inputs */
 .actions-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -310,7 +377,6 @@ input[type=range]::-webkit-slider-thumb:hover {
     }
 }
 
-/* Collapsible Sections */
 .collapsible .section-header {
     cursor: pointer;
     user-select: none;
@@ -347,18 +413,17 @@ input[type=range]::-webkit-slider-thumb:hover {
 .input-section {
     background: var(--card-bg);
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     transition: all 0.3s ease;
 }
 
 h2 {
     font-size: 1.2rem;
-    margin-bottom: 0; /* Reset margin for header alignment */
+    margin-bottom: 0;
     color: var(--text-primary);
 }
 
-/* Add margin back for non-collapsible headers or when expanded content follows */
 .input-section:not(.collapsible) h2,
 .section-content h2 {
     margin-bottom: 1.5rem;
@@ -386,10 +451,10 @@ input, select {
     padding: 0.8rem;
     background-color: var(--bg-color);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     color: var(--text-primary);
-    font-family: inherit;
-    font-size: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
     transition: border-color 0.2s;
 }
 
@@ -405,13 +470,13 @@ input:focus, select:focus {
 }
 
 .btn-primary {
-    background-color: var(--accent-color);
-    color: #fff;
+    background-color: var(--white);
+    color: var(--black);
     border: none;
     padding: 0.8rem 1.5rem;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     width: 100%;
     transition: opacity 0.2s;
@@ -430,6 +495,7 @@ input:focus, select:focus {
 
 .btn-danger {
     background-color: var(--danger-color);
+    color: var(--white);
 }
 
 .btn-secondary {
@@ -437,9 +503,9 @@ input:focus, select:focus {
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
     padding: 0.8rem 1.5rem;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 500;
     transition: all 0.2s;
     width: 100%;
@@ -450,7 +516,6 @@ input:focus, select:focus {
     color: var(--text-primary);
 }
 
-/* Search & Reports */
 .search-bar {
     display: flex;
     flex-direction: column;
@@ -492,19 +557,19 @@ input:focus, select:focus {
 .stat-item span {
     font-size: 0.8rem;
     color: var(--text-secondary);
-    text-transform: uppercase;
+    font-weight: 500;
 }
 
 .stat-item strong {
     font-size: 1.2rem;
     color: var(--accent-color);
+    font-family: var(--font-mono);
 }
 
-/* Tables */
 .history-section, .investments-section, .goals-section {
     background: var(--card-bg);
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     margin-bottom: 2rem;
 }
@@ -516,7 +581,6 @@ input:focus, select:focus {
     margin-bottom: 1.5rem;
 }
 
-/* Adjust margin for collapsed headers */
 .collapsible.collapsed .section-header {
     margin-bottom: 0;
 }
@@ -539,12 +603,14 @@ th, td {
 th {
     font-weight: 500;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 
 td {
     color: var(--text-primary);
     vertical-align: middle;
+    font-size: 0.9rem;
+    font-family: var(--font-mono);
 }
 
 tr:last-child td {
@@ -556,6 +622,7 @@ tr:last-child td {
 
 .desc-sub {
     font-size: 0.85rem;
+    font-family: var(--font-sans);
     color: var(--text-secondary);
 }
 
@@ -573,7 +640,6 @@ tr:last-child td {
 .btn-icon-small.edit { color: var(--accent-color); }
 .btn-icon-small.delete { color: var(--danger-color); }
 
-/* Pagination */
 .pagination-controls {
     display: flex;
     justify-content: center;
@@ -588,7 +654,7 @@ tr:last-child td {
     color: var(--text-secondary);
     width: 35px;
     height: 35px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
@@ -603,17 +669,17 @@ tr:last-child td {
 }
 
 .page-btn.active {
-    background: var(--accent-color);
-    color: white;
-    border-color: var(--accent-color);
+    background: var(--white);
+    color: var(--black);
+    border-color: var(--white);
 }
 
-/* Badges */
 .badge {
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     font-size: 0.8rem;
     font-weight: 500;
+    font-family: var(--font-sans);
 }
 
 .badge.card {
@@ -633,7 +699,6 @@ tr:last-child td {
     margin-left: 0.3rem;
 }
 
-/* Cards & Investments Grid */
 .cards-grid, .investments-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -643,7 +708,7 @@ tr:last-child td {
 
 .credit-card-display {
     background: linear-gradient(135deg, #2a2827 0%, #1a1817 100%);
-    border-radius: 16px;
+    border-radius: 6px;
     padding: 1.5rem;
     border: 1px solid var(--border-color);
     position: relative;
@@ -686,6 +751,7 @@ tr:last-child td {
 .card-limit {
     font-size: 0.9rem;
     color: var(--success-color);
+    font-family: var(--font-mono);
     font-weight: 600;
 }
 
@@ -697,8 +763,6 @@ tr:last-child td {
     font-size: 0.9rem;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
 }
 
 .card-dates {
@@ -710,12 +774,11 @@ tr:last-child td {
     padding-top: 0.8rem;
 }
 
-/* Invoice Section */
 .invoice-section {
     margin-top: 3rem;
     background: var(--card-bg);
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
 }
 
@@ -738,7 +801,6 @@ tr:last-child td {
     margin-bottom: 2rem;
 }
 
-/* Goals Grid */
 .goals-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -748,7 +810,7 @@ tr:last-child td {
 .goal-card {
     background: var(--bg-color);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     padding: 1.5rem;
 }
 
@@ -785,6 +847,7 @@ tr:last-child td {
     font-size: 0.9rem;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
 }
 
 .goal-deadline {
@@ -793,7 +856,6 @@ tr:last-child td {
     text-align: right;
 }
 
-/* Modal */
 .modal {
     display: none;
     position: fixed;
@@ -810,7 +872,7 @@ tr:last-child td {
 .modal-content {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     width: 90%;
     max-width: 500px;
     padding: 2rem;
@@ -861,6 +923,7 @@ tr:last-child td {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+    border: 1px solid var(--border-color);
 }
 
 .btn-remove-tag {
@@ -877,7 +940,6 @@ tr:last-child td {
     gap: 0.5rem;
 }
 
-/* Auth Pages */
 .auth-container {
     display: flex;
     justify-content: center;
@@ -888,7 +950,7 @@ tr:last-child td {
 .auth-card {
     background: var(--card-bg);
     padding: 2.5rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     width: 100%;
     max-width: 400px;
@@ -916,6 +978,6 @@ tr:last-child td {
     background: rgba(232, 124, 3, 0.1);
     border: 1px solid var(--accent-color);
     color: var(--accent-color);
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     text-align: center;
 }

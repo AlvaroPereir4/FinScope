@@ -1,29 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minha Carteira - FinScope</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <h1>Fin<span>Scope</span></h1>
-            </div>
-            <div class="user-controls">
-                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('detailed_page') }}" class="nav-link">Gastos Detalhados</a>
-                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
-                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
-                <span class="divider">|</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
-            </div>
-        </header>
+{% extends "base.html" %}
 
-        <main>
+{% block title %}Minha Carteira - FinScope{% endblock %}
+
+{% block content %}
             <section class="wallet-section">
                 <div class="section-header">
                     <h2>Minha Carteira (Saldo Real)</h2>
@@ -47,15 +26,11 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- JS populates -->
                         </tbody>
                     </table>
                 </div>
             </section>
-        </main>
-    </div>
 
-    <!-- Modal Carteira -->
     <div id="wallet-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -77,8 +52,9 @@
             </form>
         </div>
     </div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+{% block scripts %}
     <script>
         function openModal(id) {
             document.getElementById(id).style.display = 'flex';
@@ -95,5 +71,4 @@
             }
         }
     </script>
-</body>
-</html>
+{% endblock %}
