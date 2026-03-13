@@ -262,6 +262,14 @@ def get_dashboard_data():
         group_id = {"$substr": ["$date", 0, 7]}
         sort_field = "_id"
 
+    # Carrega configurações do usuário para mapear cores
+    user_settings = db.user_settings.find_one(user_id_filter)
+    custom_colors = {}
+    if user_settings and 'categories' in user_settings:
+        for cat in user_settings['categories']:
+            if isinstance(cat, dict) and 'name' in cat and 'color' in cat:
+                custom_colors[cat['name']] = cat['color']
+
     chart_data = {}
 
     if view_mode == 'category':
@@ -324,7 +332,7 @@ def get_dashboard_data():
             if cat == 'Income':
                 color = "#2ecc71"
             else:
-                color = CATEGORY_COLORS[idx % len(CATEGORY_COLORS)]
+                color = custom_colors.get(cat, CATEGORY_COLORS[idx % len(CATEGORY_COLORS)])
 
             datasets.append({
                 "label": cat,
