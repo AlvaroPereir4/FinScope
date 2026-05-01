@@ -1,4 +1,6 @@
+console.log('[finscope] dashboard.js loaded');
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[finscope] dashboard DOMContentLoaded, financeChart:', !!document.getElementById('financeChart'));
     if (!document.getElementById('financeChart')) return;
 
     const filterBtns = document.querySelectorAll('.filter-btn');
@@ -10,6 +12,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewModeSelect = document.getElementById('chart-view-mode');
     const historyTableBody = document.querySelector('#history-table tbody');
     const paginationControls = document.getElementById('pagination-controls');
+
+    window.loadData = async function(isSearch = false) {
+        console.log('[finscope] loadData called, filter:', AppState.currentFilter, 'year:', AppState.selectedYear);
+        try {
+            const params = new URLSearchParams({
+                period: AppState.currentFilter,
+                year: AppState.selectedYear,
+                granularity: AppState.chartGranularity,
+                view_mode: viewModeSelect ? viewModeSelect.value : 'general',
+            });
+            const res = await fetch(`/api/dashboard?${params}`);
+            console.log('[finscope] /api/dashboard status:', res.status);
+            const data = await res.json();
+            console.log('[finscope] dashboard data:', data);
+            updateDashboard(data.summary);
+            updateChart(data.chart_data);
+            loadTransactionsPage(1);
+        } catch (err) { console.error('[finscope] loadData error:', err); }
+    };
 
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -50,14 +71,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (viewModeSelect) viewModeSelect.addEventListener('change', loadData);
+    if (viewModeSelect) viewModeSelect.addEventListener('change', () => loadData());
 
     loadYears();
 
     async function loadYears() {
+        console.log('[finscope] loadYears called');
         try {
             const res = await fetch('/api/years');
+            console.log('[finscope] /api/years status:', res.status);
             const years = await res.json();
+            console.log('[finscope] years:', years);
             yearSelect.innerHTML = '';
             years.forEach(year => {
                 const opt = document.createElement('option');
@@ -67,34 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 yearSelect.appendChild(opt);
             });
             loadData();
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error('[finscope] loadYears error:', err); }
     }
 
-    window.loadData = async function(isSearch = false) {
-        try {
-            const params = new URLSearchParams({
-                period: AppState.currentFilter,
-                year: AppState.selectedYear,
-                granularity: AppState.chartGranularity,
-                view_mode: viewModeSelect ? viewModeSelect.value : 'general',
-            });
-            const res = await fetch(`/api/dashboard?${params}`);
-            const data = await res.json();
-            updateDashboard(data.summary);
-            updateChart(data.chart_data);
-            loadTransactionsPage(1);
-        } catch (err) { console.error(err); }
-    };
-
     async function loadTransactionsPage(page) {
+        console.log('[finscope] loadTransactionsPage', page);
         try {
             const res = await fetch(`/api/transactions?page=${page}`);
+            console.log('[finscope] /api/transactions status:', res.status);
             const pageData = await res.json();
+            console.log('[finscope] transactions total_items:', pageData.total_items);
             AppState.allTableData = pageData.items;
             AppState.currentPage = pageData.current_page;
             renderPagination(pageData);
             renderTablePage();
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error('[finscope] loadTransactionsPage error:', err); }
     }
 
     function updateDashboard(summary) {
@@ -129,6 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTablePage() {
         historyTableBody.innerHTML = '';
+        if (!AppState.allTableData.length) {
+            historyTableBody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum registro neste período</td></tr>';
+            return;
+        }
         AppState.allTableData.forEach(item => {
             const isIncome = item.type === 'income';
             let details = isIncome

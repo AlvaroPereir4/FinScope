@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 settingsModal.style.display = 'none';
                 updateSelects();
-                alert('Settings saved!');
+                showToast('Configurações salvas!');
             }
         } catch (err) { console.error(err); }
     }

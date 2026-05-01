@@ -27,10 +27,8 @@
             <div class="user-controls">
                 <a href="{{ url_for('pages.index') }}" class="nav-link">Dashboard</a>
                 <a href="{{ url_for('pages.wallet_page') }}" class="nav-link">Minha Carteira</a>
-                <a href="{{ url_for('pages.detailed_page') }}" class="nav-link">Gastos Detalhados</a>
-                <a href="{{ url_for('pages.investments_page') }}" class="nav-link">Investimentos</a>
-                <a href="{{ url_for('pages.goals_page') }}" class="nav-link">Metas</a>
-                <a href="{{ url_for('pages.cards_page') }}" class="nav-link">Meus Cartões</a>
+<a href="{{ url_for('pages.investments_page') }}" class="nav-link">Investimentos</a>
+<a href="{{ url_for('pages.cards_page') }}" class="nav-link">Meus Cartões</a>
                 <span class="divider">|</span>
                 <button id="btn-settings" class="btn-icon" title="Configurações">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -81,6 +79,7 @@
         </div>
     </div>
 
+    <div id="toast-container"></div>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

@@ -55,14 +55,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.className = 'credit-card-display';
                 el.style.cursor = 'pointer';
                 el.onclick = e => { if (e.target.tagName !== 'BUTTON') openEntryModal(inv._id); };
+                const hasGoal = inv.target_amount > 0;
+                const percent = hasGoal ? Math.min(100, (inv.current_amount / inv.target_amount) * 100) : 0;
+                const barColor = percent >= 100 ? 'var(--success-color)' : percent >= 60 ? 'var(--accent-color)' : 'var(--invest-color)';
                 el.innerHTML = `
                     <div class="card-header">
                         <h3>${inv.name}</h3>
                         <span class="card-limit">${formatCurrency(inv.current_amount)}</span>
                     </div>
                     <div class="card-details">
-                        <p>${inv.type}</p>
-                        <div class="card-dates">
+                        <p style="color:var(--text-secondary);font-size:0.8rem">${inv.type}</p>
+                        ${hasGoal ? `
+                        <div style="margin-top:0.75rem">
+                            <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden">
+                                <div style="height:100%;width:${percent}%;background:${barColor};border-radius:3px;transition:width 0.5s ease"></div>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-top:0.4rem;font-size:0.72rem;color:var(--text-secondary)">
+                                <span>${percent.toFixed(0)}%</span>
+                                <span>Meta: ${formatCurrency(inv.target_amount)}</span>
+                            </div>
+                        </div>` : ''}
+                        <div class="card-dates" style="margin-top:0.75rem">
                             <button class="btn-icon-small edit" onclick="editInvestment('${invStr}')">✎</button>
                             <button class="btn-icon-small delete" onclick="deleteInvestment('${inv._id}')">🗑</button>
                         </div>
