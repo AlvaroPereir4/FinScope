@@ -12,8 +12,7 @@
                     <button class="filter-btn" data-period="year">Ano</button>
                 </div>
                 <div class="year-selector">
-                    <select id="dashboard-year">
-                    </select>
+                    <select id="dashboard-year"></select>
                 </div>
             </div>
 
@@ -39,7 +38,7 @@
                 </div>
                 <div class="card net-worth">
                     <h3>Patrimônio Total</h3>
-                    <p id="net-worth" style="color: var(--accent-color);">R$ 0,00</p>
+                    <p id="net-worth">R$ 0,00</p>
                 </div>
             </section>
 
@@ -52,7 +51,6 @@
                                 <option value="general">Visão Geral</option>
                                 <option value="category">Por Categoria</option>
                             </select>
-
                             <div id="zoom-container" style="display: none;">
                                 <span id="zoom-label">30 Dias</span>
                                 <input type="range" id="chart-zoom" min="5" max="30" step="5" value="30">
@@ -70,83 +68,12 @@
                 </div>
             </section>
 
-            <div class="actions-grid">
-                <section class="input-section collapsible collapsed">
-                    <div class="section-header">
-                        <h2>Nova Renda</h2>
-                        <span class="toggle-icon">▼</span>
-                    </div>
-                    <div class="section-content">
-                        <form id="income-form">
-                            <div class="form-group">
-                                <label>Descrição</label>
-                                <input type="text" id="inc-desc" required placeholder="Ex: Salário">
-                            </div>
-                            <div class="form-group">
-                                <label>Valor (R$)</label>
-                                <input type="number" id="inc-amount" step="0.01" required placeholder="0.00">
-                            </div>
-                            <div class="form-group">
-                                <label>Data</label>
-                                <input type="date" id="inc-date" required>
-                            </div>
-                            <button type="submit" class="btn-primary">Adicionar Renda</button>
-                        </form>
-                    </div>
-                </section>
-
-                <section class="input-section collapsible collapsed">
-                    <div class="section-header">
-                        <h2>Nova Conta (Macro)</h2>
-                        <span class="toggle-icon">▼</span>
-                    </div>
-                    <div class="section-content">
-                        <form id="consolidated-form">
-                            <div class="form-group">
-                                <label>Descrição</label>
-                                <input type="text" id="cons-desc" required placeholder="Ex: Fatura Nubank Março, Aluguel">
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Valor (R$)</label>
-                                    <input type="number" id="cons-amount" step="0.01" required placeholder="0.00">
-                                </div>
-                                <div class="form-group">
-                                    <label>Data Pagamento</label>
-                                    <input type="date" id="cons-date" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Categoria</label>
-                                    <select id="cons-category">
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Método</label>
-                                    <select id="cons-method">
-                                        <option value="debit">Débito (Conta Corrente)</option>
-                                        <option value="pix">PIX</option>
-                                        <option value="credit">Crédito</option>
-                                        <option value="cash">Dinheiro</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Vincular Cartão (Opcional)</label>
-                                <select id="cons-card">
-                                    <option value="">Nenhum</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn-primary btn-danger">Registrar Saída</button>
-                        </form>
-                    </div>
-                </section>
-            </div>
-
             <section class="history-section">
                 <div class="section-header">
                     <h2>Histórico de Contas (Macro)</h2>
+                    <a href="{{ url_for('pages.detailed_page') }}" class="detail-link">
+                        Ver gastos detalhados →
+                    </a>
                 </div>
                 <div class="table-container">
                     <table id="history-table">
@@ -160,12 +87,109 @@
                                 <th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
-                <div class="pagination-controls" id="pagination-controls">
-                </div>
+                <div class="pagination-controls" id="pagination-controls"></div>
             </section>
+
+<!-- FAB -->
+<button class="fab" id="fab-add" title="Novo registro">+</button>
+
+<!-- Quick Input Modal -->
+<div id="quick-input-modal" class="modal">
+    <div class="modal-content modal-wide">
+        <div class="modal-header">
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="renda">Nova Renda</button>
+                <button class="modal-tab" data-tab="conta">Nova Conta</button>
+            </div>
+            <span class="close-modal" id="close-quick-modal">&times;</span>
+        </div>
+
+        <div id="tab-renda" class="modal-tab-content active">
+            <form id="income-form">
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" id="inc-desc" required placeholder="Ex: Salário">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor (R$)</label>
+                        <input type="number" id="inc-amount" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Data</label>
+                        <input type="date" id="inc-date" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Adicionar Renda</button>
+            </form>
+        </div>
+
+        <div id="tab-conta" class="modal-tab-content">
+            <form id="consolidated-form">
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" id="cons-desc" required placeholder="Ex: Fatura Nubank Março, Aluguel">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor (R$)</label>
+                        <input type="number" id="cons-amount" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Pagamento</label>
+                        <input type="date" id="cons-date" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Categoria</label>
+                        <select id="cons-category"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Método</label>
+                        <select id="cons-method">
+                            <option value="debit">Débito (Conta Corrente)</option>
+                            <option value="pix">PIX</option>
+                            <option value="credit">Crédito</option>
+                            <option value="cash">Dinheiro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Vincular Cartão (Opcional)</label>
+                    <select id="cons-card"><option value="">Nenhum</option></select>
+                </div>
+                <button type="submit" class="btn-primary btn-danger">Registrar Saída</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const modal = document.getElementById('quick-input-modal');
+    const fab   = document.getElementById('fab-add');
+    const closeBtn = document.getElementById('close-quick-modal');
+
+    fab.addEventListener('click', () => {
+        modal.style.display = 'flex';
+    });
+    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    window.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+    modal.querySelectorAll('.modal-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            modal.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            modal.querySelectorAll('.modal-tab-content').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        });
+    });
+})();
+</script>
+
 <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 {% endblock %}

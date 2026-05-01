@@ -108,15 +108,21 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             if (response.ok) {
-                if (AppState.isEditing) cancelEdit();
-                else e.target.reset();
+                showToast(AppState.isEditing ? 'Atualizado com sucesso!' : 'Salvo com sucesso!');
+                const modal = e.target.closest('.modal');
+                if (AppState.isEditing) {
+                    cancelEdit();
+                } else {
+                    e.target.reset();
+                    if (modal) modal.style.display = 'none';
+                }
                 if (type === 'income') document.getElementById('inc-date').value = AppState.today;
                 else if (type === 'consolidated') document.getElementById('cons-date').value = AppState.today;
                 else { document.getElementById('exp-date').value = AppState.today; toggleCardSelect(); }
                 if (window.location.pathname === '/detailed') loadDetailedData();
                 else if (typeof loadData === 'function') loadData();
-            } else { alert('Error saving data'); }
-        } catch (err) { console.error(err); }
+            } else { showToast('Erro ao salvar registro', 'error'); }
+        } catch (err) { console.error(err); showToast('Erro ao salvar registro', 'error'); }
     }
 
     window.editExpense = function(expenseStr) {
@@ -315,6 +321,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function _expandAndScroll(form) {
+        const modal = form.closest('.modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            const pane = form.closest('.modal-tab-content');
+            if (pane) {
+                modal.querySelectorAll('.modal-tab-content').forEach(t => t.classList.remove('active'));
+                pane.classList.add('active');
+                const tabId = pane.id.replace('tab-', '');
+                modal.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+            }
+            return;
+        }
         const section = form.closest('.input-section');
         if (section && section.classList.contains('collapsed')) section.classList.remove('collapsed');
         form.scrollIntoView({ behavior: 'smooth' });

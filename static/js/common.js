@@ -1,3 +1,4 @@
+console.log('[finscope] common.js loaded');
 // Shared state and utilities — loaded first on every page
 window.AppState = {
     currentCategories: [],
@@ -27,6 +28,16 @@ window.formatCurrency = function(value) {
 window.formatDate = function(dateString) {
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
+};
+
+window.showToast = function(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 };
 
 // Collapsible sections — present on multiple pages
