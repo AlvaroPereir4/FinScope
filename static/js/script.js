@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const categoriesList = document.getElementById('categories-list');
     const buyersList = document.getElementById('buyers-list');
     const newCategoryInput = document.getElementById('new-category-input');
+    const newCategoryColor = document.getElementById('new-category-color');
     const newBuyerInput = document.getElementById('new-buyer-input');
     const btnAddCategory = document.getElementById('btn-add-category');
     const btnAddBuyer = document.getElementById('btn-add-buyer');
@@ -209,12 +210,29 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTagsList(buyersList, currentBuyers, 'buyer');
         });
         
-        closeModal.addEventListener('click', () => settingsModal.style.display = 'none');
+        if (closeModal) closeModal.addEventListener('click', () => settingsModal.style.display = 'none');
         window.addEventListener('click', (e) => {
             if (e.target === settingsModal) settingsModal.style.display = 'none';
         });
 
-        btnAddCategory.addEventListener('click', () => addTag(newCategoryInput, currentCategories, categoriesList, 'category'));
+        btnAddCategory.addEventListener('click', () => {
+            const val = newCategoryInput.value.trim();
+            const color = newCategoryColor ? newCategoryColor.value : '#3498db';
+            
+            if(val) {
+                // Verifica duplicidade (considerando que currentCategories agora são objetos)
+                const exists = currentCategories.some(c => c.name.toLowerCase() === val.toLowerCase());
+                
+                if(!exists) {
+                    currentCategories.push({ name: val, color: color });
+                    newCategoryInput.value = '';
+                    // Cor aleatória para a próxima
+                    if(newCategoryColor) newCategoryColor.value = '#' + Math.floor(Math.random()*16777215).toString(16);
+                    renderTagsList(categoriesList, currentCategories, 'category');
+                }
+            }
+        });
+
         btnAddBuyer.addEventListener('click', () => addTag(newBuyerInput, currentBuyers, buyersList, 'buyer'));
         btnSaveSettings.addEventListener('click', saveSettings);
     }
@@ -348,7 +366,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/settings');
             const data = await res.json();
-            currentCategories = data.categories || [];
+            
+            // Normaliza categorias: Se vier string (legado), converte para objeto com cor padrão
+            currentCategories = (data.categories || []).map(cat => {
+                if (typeof cat === 'string') {
+                    return { name: cat, color: '#3498db' };
+                }
+                return cat;
+            });
+            
             currentBuyers = data.buyers || [];
             updateSelects();
         } catch (err) { console.error(err); }
@@ -383,12 +409,37 @@ document.addEventListener('DOMContentLoaded', () => {
         list.forEach((item, index) => {
             const el = document.createElement('div');
             el.className = 'category-item';
+            
+            let contentHtml = '';
+            
+            if (type === 'category') {
+                // Para categorias, item é objeto {name, color}
+                // Adiciona o input de cor para permitir edição inline
+                contentHtml = `
+                    <input type="color" class="category-color-picker-small" value="${item.color}" data-index="${index}">
+                    <span>${item.name}</span>
+                `;
+            } else {
+                // Para compradores, item é string
+                contentHtml = `<span>${item}</span>`;
+            }
+
             el.innerHTML = `
-                <span>${item}</span>
+                ${contentHtml}
                 <button class="btn-remove-tag" data-index="${index}" data-type="${type}">×</button>
             `;
             container.appendChild(el);
         });
+
+        // Listener para mudança de cor em tempo real (edição)
+        if (type === 'category') {
+            container.querySelectorAll('.category-color-picker-small').forEach(picker => {
+                picker.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.dataset.index);
+                    list[idx].color = e.target.value;
+                });
+            });
+        }
 
         container.querySelectorAll('.btn-remove-tag').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -405,9 +456,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if(sel) {
                 sel.innerHTML = '';
                 currentCategories.forEach(cat => {
+                    // Garante que pegamos o nome, caso seja objeto
+                    const name = typeof cat === 'object' ? cat.name : cat;
                     const opt = document.createElement('option');
-                    opt.value = cat;
-                    opt.textContent = cat;
+                    opt.value = name;
+                    opt.textContent = name;
                     sel.appendChild(opt);
                 });
             }

@@ -21,3 +21,6 @@ env/
 
 # OS generated files
 Thumbs.db
+
+# Claude Code
+CLAUDE.md

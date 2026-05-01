@@ -25,12 +25,12 @@
                 <h1>Fin<span>Scope</span></h1>
             </div>
             <div class="user-controls">
-                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('wallet_page') }}" class="nav-link">Minha Carteira</a>
-                <a href="{{ url_for('detailed_page') }}" class="nav-link">Gastos Detalhados</a>
-                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
-                <a href="{{ url_for('goals_page') }}" class="nav-link">Metas</a>
-                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <a href="{{ url_for('pages.index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('pages.wallet_page') }}" class="nav-link">Minha Carteira</a>
+                <a href="{{ url_for('pages.detailed_page') }}" class="nav-link">Gastos Detalhados</a>
+                <a href="{{ url_for('pages.investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('pages.goals_page') }}" class="nav-link">Metas</a>
+                <a href="{{ url_for('pages.cards_page') }}" class="nav-link">Meus Cartões</a>
                 <span class="divider">|</span>
                 <button id="btn-settings" class="btn-icon" title="Configurações">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,7 +40,7 @@
                 </button>
                 <span class="divider">|</span>
                 <span>Olá, {{ current_user.username }}</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>
             </div>
         </header>
 
@@ -61,6 +61,7 @@
                     <div class="tags-list" id="categories-list"></div>
                     <div class="add-tag-form">
                         <input type="text" id="new-category-input" placeholder="Nova categoria...">
+                        <input type="color" id="new-category-color" value="#3498db" title="Cor da categoria" style="width: 50px; padding: 2px; height: 42px; cursor: pointer;">
                         <button id="btn-add-category" class="btn-primary" style="width: auto;">+</button>
                     </div>
                 </div>
@@ -80,7 +81,14 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/expenses.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/investments.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/goals.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/wallets.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cards.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
