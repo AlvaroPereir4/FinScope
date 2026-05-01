@@ -4,3 +4,4 @@ gunicorn
 pymongo
 flask-login
 werkzeug
+python-dateutil

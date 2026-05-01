@@ -14,11 +14,11 @@
                 <h1>Fin<span>Scope</span></h1>
             </div>
             <div class="user-controls">
-                <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
-                <a href="{{ url_for('investments_page') }}" class="nav-link">Investimentos</a>
-                <a href="{{ url_for('cards_page') }}" class="nav-link">Meus Cartões</a>
+                <a href="{{ url_for('pages.index') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('pages.investments_page') }}" class="nav-link">Investimentos</a>
+                <a href="{{ url_for('pages.cards_page') }}" class="nav-link">Meus Cartões</a>
                 <span class="divider">|</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn-logout">Sair</a>
             </div>
         </header>
 
@@ -74,7 +74,9 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/goals.js') }}"></script>
     <script>
         function openModal(id) {
             document.getElementById(id).style.display = 'flex';
